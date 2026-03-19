@@ -165,6 +165,10 @@ export default function BigCalendar() {
         if (res.ok) {
           await fetchEvents()
           setDialogOpen(false)
+        } else {
+          const errorData = await res.json()
+          console.error("Failed to update event:", errorData)
+          alert(`Failed to update event: ${errorData.error || 'Unknown error'}`)
         }
       } else {
         // Create new event
@@ -183,10 +187,15 @@ export default function BigCalendar() {
         if (res.ok) {
           await fetchEvents()
           setDialogOpen(false)
+        } else {
+          const errorData = await res.json()
+          console.error("Failed to create event:", errorData)
+          alert(`Failed to create event: ${errorData.error || 'Unknown error'}`)
         }
       }
     } catch (error) {
       console.error("Failed to save event:", error)
+      alert(`Failed to save event: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setLoading(false)
     }
