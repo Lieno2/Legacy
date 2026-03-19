@@ -14,12 +14,6 @@ pub struct AppState {
     pub cfg: crate::config::Config,
 }
 
-impl axum::extract::FromRef<AppState> for AppState {
-    fn from_ref(state: &AppState) -> Self {
-        state.clone()
-    }
-}
-
 pub fn all_routes() -> Router<AppState> {
     Router::new()
         // Auth
