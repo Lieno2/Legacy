@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, tick } from 'svelte';
   import { apiFetch } from '$lib/api';
   import type { Event } from '$lib/types';
-  import { X, MapPin, AlignLeft, Lock, Calendar, Clock, Edit3, Plus, AlertCircle } from 'lucide-svelte';
+  import { X, MapPin, AlignLeft, Lock, Calendar, Clock, Edit3, Plus, AlertCircle, Search, UserMinus, Loader2 } from 'lucide-svelte';
 
   export let event: Event | null = null;
   export let defaultDate: string = '';
@@ -20,6 +20,8 @@
     { hex: '#ef4444', name: 'Red'     },
     { hex: '#3b82f6', name: 'Blue'    },
   ];
+
+  interface InviteUser { id: string; username: string; email: string; }
 
   function parseDefault() {
     const src = event ? event.date.slice(0, 16) : defaultDate;
@@ -39,6 +41,70 @@
   let isPrivate   = event?.private ?? false;
   let saving      = false;
   let fieldErrors: Record<string, string> = {};
+
+  // ── Invite state (only relevant for existing private events) ──────────────
+  let searchQ       = '';
+  let searchResults: InviteUser[] = [];
+  let searchLoading = false;
+  let invited: InviteUser[]       = [];
+  let inviteLoading: Record<string, boolean> = {};
+  let searchDebounce: ReturnType<typeof setTimeout>;
+
+  $: savedEventId = event?.id ?? null;
+  $: showAccessPanel = isPrivate && savedEventId !== null;
+
+  // Load existing invites when editing a private event
+  $: if (showAccessPanel && savedEventId) {
+    loadInvited(savedEventId);
+  }
+
+  async function loadInvited(id: number) {
+    try {
+      invited = await apiFetch<InviteUser[]>(`/api/invites?event_id=${id}`);
+    } catch { invited = []; }
+  }
+
+  function onSearchInput() {
+    clearTimeout(searchDebounce);
+    if (!searchQ.trim() || !savedEventId) { searchResults = []; return; }
+    searchDebounce = setTimeout(async () => {
+      searchLoading = true;
+      try {
+        searchResults = await apiFetch<InviteUser[]>(
+          `/api/invites/search?q=${encodeURIComponent(searchQ)}&event_id=${savedEventId}`
+        );
+      } catch { searchResults = []; }
+      finally { searchLoading = false; }
+    }, 300);
+  }
+
+  async function addInvite(u: InviteUser) {
+    if (!savedEventId) return;
+    inviteLoading[u.id] = true;
+    try {
+      await apiFetch('/api/invites', {
+        method: 'POST',
+        body: JSON.stringify({ event_id: savedEventId, user_id: u.id })
+      });
+      searchResults = searchResults.filter(r => r.id !== u.id);
+      searchQ = '';
+      await loadInvited(savedEventId);
+    } catch { /* ignore */ }
+    finally { inviteLoading[u.id] = false; }
+  }
+
+  async function removeInvite(u: InviteUser) {
+    if (!savedEventId) return;
+    inviteLoading[u.id] = true;
+    try {
+      await apiFetch('/api/invites', {
+        method: 'DELETE',
+        body: JSON.stringify({ event_id: savedEventId, user_id: u.id })
+      });
+      await loadInvited(savedEventId);
+    } catch { /* ignore */ }
+    finally { inviteLoading[u.id] = false; }
+  }
 
   $: headerDate = dateVal
     ? new Date(dateVal + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })
@@ -118,27 +184,20 @@
       <h2 class="text-sm font-semibold flex-1 leading-tight">
         {event ? 'Edit event' : 'New event'}{#if headerDate}<span class="text-muted-foreground font-normal"> — {headerDate}</span>{/if}
       </h2>
-      <button
-        on:click={() => dispatch('cancel')}
-        class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground"
-        aria-label="Close"
-      >
+      <button on:click={() => dispatch('cancel')} aria-label="Close"
+        class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
         <X class="w-4 h-4" />
       </button>
     </div>
 
-    <div class="flex flex-col gap-4 p-5 overflow-y-auto max-h-[80vh]">
+    <div class="flex flex-col gap-4 p-5 overflow-y-auto max-h-[85vh]">
 
       <!-- Title -->
       <div class="flex flex-col gap-1.5">
         <label for="ev-title" class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
-        <input
-          id="ev-title"
-          bind:value={title}
-          placeholder="e.g. Team meeting"
+        <input id="ev-title" bind:value={title} placeholder="e.g. Team meeting"
           class={inputCls('title')}
-          on:input={() => { delete fieldErrors.title; fieldErrors = fieldErrors; }}
-        />
+          on:input={() => { delete fieldErrors.title; fieldErrors = fieldErrors; }} />
         {#if fieldErrors.title}
           <p class="flex items-center gap-1 text-xs text-red-400">
             <AlertCircle class="w-3 h-3 shrink-0" /> {fieldErrors.title}
@@ -152,13 +211,8 @@
           <label for="ev-date" class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
             <Calendar class="w-3 h-3" /> Date
           </label>
-          <input
-            id="ev-date"
-            type="date"
-            bind:value={dateVal}
-            class={inputCls('date')}
-            on:change={() => { delete fieldErrors.date; fieldErrors = fieldErrors; }}
-          />
+          <input id="ev-date" type="date" bind:value={dateVal} class={inputCls('date')}
+            on:change={() => { delete fieldErrors.date; fieldErrors = fieldErrors; }} />
           {#if fieldErrors.date}
             <p class="flex items-center gap-1 text-xs text-red-400">
               <AlertCircle class="w-3 h-3 shrink-0" /> {fieldErrors.date}
@@ -179,13 +233,9 @@
           <AlignLeft class="w-3 h-3" /> Description
           <span class="normal-case font-normal text-muted-foreground/50 ml-0.5">(optional)</span>
         </label>
-        <textarea
-          id="ev-desc"
-          bind:value={description}
-          rows="3"
+        <textarea id="ev-desc" bind:value={description} rows="3"
           placeholder="Add more details about this event..."
-          class="{BASE_INPUT} py-2 resize-none border-input"
-        ></textarea>
+          class="{BASE_INPUT} py-2 resize-none border-input"></textarea>
       </div>
 
       <!-- Location -->
@@ -194,12 +244,8 @@
           <MapPin class="w-3 h-3" /> Location
           <span class="normal-case font-normal text-muted-foreground/50 ml-0.5">(optional)</span>
         </label>
-        <input
-          id="ev-loc"
-          bind:value={location}
-          placeholder="Office, Zoom link, address..."
-          class="{BASE_INPUT} h-9 border-input"
-        />
+        <input id="ev-loc" bind:value={location} placeholder="Office, Zoom link, address..."
+          class="{BASE_INPUT} h-9 border-input" />
       </div>
 
       <!-- Color + Private -->
@@ -208,21 +254,14 @@
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Color</span>
           <div class="flex items-center gap-2 py-1 px-0.5">
             {#each COLORS as c}
-              <button
-                type="button"
-                on:click={() => (color = c.hex)}
-                title={c.name}
-                aria-label={c.name}
+              <button type="button" on:click={() => (color = c.hex)} title={c.name} aria-label={c.name}
                 class="w-4 h-4 rounded-full transition-all duration-150 shrink-0
-                       {color === c.hex
-                         ? 'scale-125 ring-2 ring-offset-2 ring-offset-card'
-                         : 'opacity-50 hover:opacity-100 hover:scale-110'}"
+                       {color === c.hex ? 'scale-125 ring-2 ring-offset-2 ring-offset-card' : 'opacity-50 hover:opacity-100 hover:scale-110'}"
                 style="background:{c.hex}; --tw-ring-color:{c.hex};"
               ></button>
             {/each}
           </div>
         </div>
-
         <label for="ev-private" class="flex items-center gap-2 cursor-pointer select-none shrink-0 pb-1">
           <span class="text-sm text-muted-foreground flex items-center gap-1.5">
             <Lock class="w-3.5 h-3.5" /> Private
@@ -237,6 +276,101 @@
         </label>
       </div>
 
+      <!-- Manage Access (private + existing event only) -->
+      {#if showAccessPanel}
+        <div class="flex flex-col gap-3 pt-1 border-t border-border">
+          <div class="flex items-center gap-2">
+            <Lock class="w-3.5 h-3.5 text-muted-foreground" />
+            <span class="text-xs font-semibold text-foreground">Manage Access</span>
+          </div>
+          <p class="text-xs text-muted-foreground -mt-1">Add people who can see this private event and RSVP to it.</p>
+
+          <!-- Search box -->
+          <div class="relative">
+            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              bind:value={searchQ}
+              on:input={onSearchInput}
+              placeholder="Search by username or email..."
+              class="{BASE_INPUT} h-9 border-input pl-8"
+            />
+            {#if searchLoading}
+              <Loader2 class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground animate-spin" />
+            {/if}
+          </div>
+
+          <!-- Search results dropdown -->
+          {#if searchResults.length > 0}
+            <div class="flex flex-col gap-px rounded-xl border border-border bg-muted/30 overflow-hidden -mt-1">
+              {#each searchResults as u}
+                <button
+                  type="button"
+                  on:click={() => addInvite(u)}
+                  disabled={inviteLoading[u.id]}
+                  class="flex items-center gap-3 px-3 py-2 hover:bg-muted transition text-left disabled:opacity-50"
+                >
+                  <div
+                    class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold uppercase shrink-0"
+                    style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);"
+                  >{u.username[0]}</div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate">{u.username}</p>
+                    <p class="text-xs text-muted-foreground truncate">{u.email}</p>
+                  </div>
+                  {#if inviteLoading[u.id]}
+                    <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                  {:else}
+                    <Plus class="w-3.5 h-3.5 text-muted-foreground" />
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
+
+          <!-- Invited list -->
+          {#if invited.length > 0}
+            <div class="flex flex-col gap-1">
+              <p class="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Invited ({invited.length})</p>
+              {#each invited as u}
+                <div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-muted/20 border border-border">
+                  <div
+                    class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold uppercase shrink-0"
+                    style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);"
+                  >{u.username[0]}</div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate">{u.username}</p>
+                    <p class="text-xs text-muted-foreground truncate">{u.email}</p>
+                  </div>
+                  <button
+                    type="button"
+                    on:click={() => removeInvite(u)}
+                    disabled={inviteLoading[u.id]}
+                    aria-label="Remove {u.username}"
+                    class="w-6 h-6 rounded-md flex items-center justify-center
+                           text-muted-foreground hover:text-red-400 hover:bg-red-500/10
+                           transition disabled:opacity-40"
+                  >
+                    {#if inviteLoading[u.id]}
+                      <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                    {:else}
+                      <UserMinus class="w-3.5 h-3.5" />
+                    {/if}
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {:else if showAccessPanel}
+            <p class="text-xs text-muted-foreground">No one invited yet.</p>
+          {/if}
+        </div>
+      {:else if isPrivate && !savedEventId}
+        <div class="flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5">
+          <AlertCircle class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          Save the event first, then edit it to manage who can see it.
+        </div>
+      {/if}
+
+      <!-- Global error -->
       {#if fieldErrors.global}
         <div class="flex items-start gap-2.5 px-3 py-3 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl">
           <AlertCircle class="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
@@ -244,21 +378,15 @@
         </div>
       {/if}
 
+      <!-- Actions -->
       <div class="flex gap-2 pt-1">
-        <button
-          type="button"
-          on:click={() => dispatch('cancel')}
+        <button type="button" on:click={() => dispatch('cancel')}
           class="flex-1 h-9 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition"
         >Cancel</button>
-        <button
-          type="button"
-          on:click={handleSubmit}
-          disabled={saving}
+        <button type="button" on:click={handleSubmit} disabled={saving}
           class="flex-1 h-9 rounded-xl text-sm font-semibold transition active:scale-[0.97] disabled:opacity-50 text-white"
           style="background:{color};"
-        >
-          {saving ? 'Saving…' : event ? 'Update event' : 'Create event'}
-        </button>
+        >{saving ? 'Saving…' : event ? 'Update event' : 'Create event'}</button>
       </div>
     </div>
   </div>
