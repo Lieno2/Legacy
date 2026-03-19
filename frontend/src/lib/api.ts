@@ -52,8 +52,8 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const doRequest = async (token: string | null) => {
-    return fetch(`${BASE}${path}`, {
+  const doRequest = async (token: string | null) =>
+    fetch(`${BASE}${path}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -61,11 +61,9 @@ export async function apiFetch<T = unknown>(
         ...(options.headers ?? {})
       }
     });
-  };
 
   let res = await doRequest(_accessToken);
 
-  // If 401, try to refresh once
   if (res.status === 401) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
@@ -79,9 +77,14 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error ?? 'Request failed');
+    // Try to parse error body, fall back gracefully
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? err.message ?? `Request failed (${res.status})`);
   }
 
-  return res.json() as Promise<T>;
+  // 204 No Content — return empty object cast to T
+  if (res.status === 204) return {} as T;
+  const text = await res.text();
+  if (!text) return {} as T;
+  return JSON.parse(text) as T;
 }
