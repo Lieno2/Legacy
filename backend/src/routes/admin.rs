@@ -80,17 +80,18 @@ pub struct StatsResponse {
     pub rsvp_breakdown: RsvpBreakdown,
 }
 
+/// Mirrors the actual DB schema for AuditLog:
+/// id, "userId", username, action, "targetType", "targetId", "targetName", metadata, "createdAt"
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct AuditEntry {
     pub id: i64,
-    pub actor_id: Option<String>,
-    pub actor_name: Option<String>,
+    pub user_id: Option<String>,
+    pub username: Option<String>,
     pub action: String,
-    pub entity_type: String,
-    pub entity_id: Option<String>,
-    pub entity_name: Option<String>,
-    pub detail: Option<String>,
-    pub snapshot: Option<serde_json::Value>,
+    pub target_type: Option<String>,
+    pub target_id: Option<String>,
+    pub target_name: Option<String>,
+    pub metadata: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -228,6 +229,7 @@ pub async fn delete_event(
     State(state): State<AppState>,
     Query(q): Query<EventIdQuery>,
 ) -> Result<Json<serde_json::Value>> {
+    // Snapshot the event before deleting
     let snapshot = sqlx::query_as::<_, EventWithCreator>(
         r#"SELECT e.id,e.title,e.description,e.date AT TIME ZONE 'UTC' AS date,
            e.location,e.color,e."createdBy" AS created_by,
@@ -245,12 +247,19 @@ pub async fn delete_event(
     sqlx::query(r#"DELETE FROM "Events" WHERE id=$1"#)
         .bind(q.id).execute(&state.db).await?;
 
+    // Resolve actor username from DB
+    let actor_username = sqlx::query_scalar::<_, String>(
+        r#"SELECT username FROM "Users" WHERE id=$1"#
+    ).bind(&admin.0.sub).fetch_optional(&state.db).await?
+     .unwrap_or_else(|| admin.0.sub.clone());
+
+    // Write audit log using actual DB column names
     sqlx::query(
-        r#"INSERT INTO "AuditLog" (actor_id,actor_name,action,entity_type,entity_id,entity_name,detail,snapshot)
-           VALUES ($1,$2,'delete','event',$3,$4,'Admin deleted event',$5)"#
+        r#"INSERT INTO "AuditLog" ("userId",username,action,"targetType","targetId","targetName",metadata)
+           VALUES ($1,$2,'delete','event',$3,$4,$5)"#
     )
     .bind(&admin.0.sub)
-    .bind(&admin.0.sub)
+    .bind(&actor_username)
     .bind(q.id.to_string())
     .bind(&entity_name)
     .bind(&snap_json)
@@ -325,7 +334,8 @@ pub async fn get_stats(
     let going     = sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM "EventMembers" WHERE status='going'"#).fetch_one(&state.db).await?;
     let late      = sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM "EventMembers" WHERE status='late'"#).fetch_one(&state.db).await?;
     let not_going = sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM "EventMembers" WHERE status='not_going'"#).fetch_one(&state.db).await?;
-    let invited   = sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM "EventMembers" WHERE status='invited'"#).fetch_one(&state.db).await?;
+    // "invited" status lives in EventInvites table, count rows there instead
+    let invited   = sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM "EventInvites""#).fetch_one(&state.db).await?;
 
     Ok(Json(StatsResponse {
         events_per_month,
@@ -346,9 +356,17 @@ pub async fn list_audit(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AuditEntry>>> {
     let entries = sqlx::query_as::<_, AuditEntry>(
-        r#"SELECT id,actor_id,actor_name,action,entity_type,entity_id,entity_name,detail,snapshot,
-           created_at AT TIME ZONE 'UTC' AS created_at
-           FROM "AuditLog" ORDER BY created_at DESC LIMIT 200"#
+        // Alias camelCase DB columns to snake_case Rust field names
+        r#"SELECT id,
+           "userId"     AS user_id,
+           username,
+           action,
+           "targetType" AS target_type,
+           "targetId"   AS target_id,
+           "targetName" AS target_name,
+           metadata,
+           "createdAt" AT TIME ZONE 'UTC' AS created_at
+           FROM "AuditLog" ORDER BY "createdAt" DESC LIMIT 200"#
     ).fetch_all(&state.db).await?;
     Ok(Json(entries))
 }
@@ -362,16 +380,23 @@ pub async fn revert_audit(
     Json(body): Json<RevertRequest>,
 ) -> Result<Json<serde_json::Value>> {
     let entry = sqlx::query_as::<_, AuditEntry>(
-        r#"SELECT id,actor_id,actor_name,action,entity_type,entity_id,entity_name,detail,snapshot,
-           created_at AT TIME ZONE 'UTC' AS created_at
+        r#"SELECT id,
+           "userId"     AS user_id,
+           username,
+           action,
+           "targetType" AS target_type,
+           "targetId"   AS target_id,
+           "targetName" AS target_name,
+           metadata,
+           "createdAt" AT TIME ZONE 'UTC' AS created_at
            FROM "AuditLog" WHERE id=$1"#
     ).bind(body.audit_id).fetch_optional(&state.db).await?.ok_or(AppError::NotFound)?;
 
-    if entry.action != "delete" || entry.entity_type != "event" {
+    if entry.action != "delete" || entry.target_type.as_deref() != Some("event") {
         return Err(AppError::BadRequest("Only deleted events can be reverted".into()));
     }
 
-    let snap = entry.snapshot.ok_or(AppError::BadRequest("No snapshot available".into()))?;
+    let snap = entry.metadata.ok_or(AppError::BadRequest("No snapshot available".into()))?;
     let ev: EventWithCreator = serde_json::from_value(snap)
         .map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
 
@@ -390,8 +415,10 @@ pub async fn revert_audit(
     .bind(ev.private)
     .execute(&state.db).await?;
 
-    sqlx::query(r#"UPDATE "AuditLog" SET detail=detail||' [REVERTED]' WHERE id=$1"#)
-        .bind(body.audit_id).execute(&state.db).await?;
+    // Mark as reverted in metadata
+    sqlx::query(
+        r#"UPDATE "AuditLog" SET metadata = COALESCE(metadata,'{}') || '{"reverted":true}' WHERE id=$1"#
+    ).bind(body.audit_id).execute(&state.db).await?;
 
     Ok(Json(serde_json::json!({ "success": true })))
 }
