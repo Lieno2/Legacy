@@ -7,9 +7,9 @@ mod auth;
 
 use axum::{
     Router,
-    http::{HeaderValue, Method},
+    http::{HeaderValue, Method, header},
 };
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -30,7 +30,7 @@ async fn main() {
     let cors = CorsLayer::new()
         .allow_origin(cfg.frontend_url.parse::<HeaderValue>().unwrap())
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
-        .allow_headers(Any)
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
         .allow_credentials(true);
 
     let app = Router::new()
