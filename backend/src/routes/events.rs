@@ -31,7 +31,9 @@ pub struct UpdateEventRequest {
     pub private: Option<bool>,
 }
 
-/// List events for the current user
+/// List events visible to the current user:
+/// - all public events
+/// - private events where user is the creator or an invited member
 #[utoipa::path(
     get,
     path = "/api/events",
@@ -56,22 +58,14 @@ pub async fn list(
                e.private, u.username AS creator_name
         FROM "Events" e
         LEFT JOIN "Users" u ON e."createdBy" = u.id
-        WHERE e."createdBy" = $1
-
-        UNION
-
-        SELECT e.id, e.title, e.description,
-               e.date AT TIME ZONE 'UTC' AS date,
-               e.location, e.color,
-               e."createdBy" AS created_by,
-               e."createdAt" AT TIME ZONE 'UTC' AS created_at,
-               e.private, u.username AS creator_name
-        FROM "EventMembers" em
-        INNER JOIN "Events" e ON em."eventId" = e.id
-        LEFT JOIN "Users" u ON e."createdBy" = u.id
-        WHERE em."userId" = $1 AND e.private = false
-
-        ORDER BY date ASC
+        WHERE
+            e.private = false
+            OR e."createdBy" = $1
+            OR EXISTS (
+                SELECT 1 FROM "EventMembers" em
+                WHERE em."eventId" = e.id AND em."userId" = $1
+            )
+        ORDER BY e.date ASC
         "#
     )
     .bind(&auth.0.sub)
