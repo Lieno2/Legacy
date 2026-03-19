@@ -15,7 +15,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
 
-use routes::{auth as auth_routes, events, rsvp, account, admin};
+use routes::{auth as auth_routes, events, rsvp, account, admin, invites};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -44,6 +44,15 @@ use routes::{auth as auth_routes, events, rsvp, account, admin};
         admin::delete_user,
         admin::list_events,
         admin::delete_event,
+        admin::get_discord,
+        admin::save_discord,
+        admin::get_stats,
+        admin::list_audit,
+        admin::revert_audit,
+        invites::search_users,
+        invites::list,
+        invites::invite,
+        invites::remove,
     ),
     components(
         schemas(
@@ -63,14 +72,25 @@ use routes::{auth as auth_routes, events, rsvp, account, admin};
             admin::UpdateUserRequest,
             admin::IdQuery,
             admin::EventIdQuery,
+            admin::DiscordConfig,
+            admin::StatsResponse,
+            admin::MonthStat,
+            admin::ActiveUser,
+            admin::RsvpBreakdown,
+            admin::AuditEntry,
+            admin::RevertRequest,
+            invites::InviteUser,
+            invites::InviteRequest,
+            invites::RemoveInviteRequest,
         )
     ),
     tags(
-        (name = "Auth", description = "Authentication endpoints"),
-        (name = "Events", description = "Event management"),
-        (name = "RSVP", description = "RSVP management"),
+        (name = "Auth",    description = "Authentication endpoints"),
+        (name = "Events",  description = "Event management"),
+        (name = "RSVP",    description = "RSVP management"),
         (name = "Account", description = "User account"),
-        (name = "Admin", description = "Admin only endpoints"),
+        (name = "Admin",   description = "Admin only endpoints"),
+        (name = "Invites", description = "Private event invite management"),
     ),
     security(
         ("bearer_auth" = [])
@@ -111,7 +131,6 @@ async fn main() {
     let pg_pool = db::create_pg_pool(&cfg.database_url).await;
     let redis_client = db::create_redis_client(&cfg.redis_url);
 
-    // Run setup account seeding
     setup::run_setup(&pg_pool, &cfg).await;
 
     let cors = CorsLayer::new()

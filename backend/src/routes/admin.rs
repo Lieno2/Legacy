@@ -10,11 +10,9 @@ use crate::{
     routes::AppState,
 };
 
-// ─── shared query params ───────────────────────────────────────────────────
 #[derive(Deserialize, ToSchema)] pub struct IdQuery     { pub id: String }
 #[derive(Deserialize, ToSchema)] pub struct EventIdQuery { pub id: i64    }
 
-// ─── user requests ─────────────────────────────────────────────────────────
 #[derive(Deserialize, ToSchema)]
 pub struct CreateUserRequest {
     pub username: String,
@@ -32,12 +30,11 @@ pub struct UpdateUserRequest {
     pub new_password: Option<String>,
 }
 
-// ─── discord config ────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct DiscordConfig {
     pub webhook_url: String,
     pub enabled: bool,
-    pub format: String,           // "embed" | "plain"
+    pub format: String,
     pub msg_created: String,
     pub msg_updated: String,
     pub msg_deleted: String,
@@ -56,7 +53,6 @@ impl Default for DiscordConfig {
     }
 }
 
-// ─── stats ─────────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct MonthStat {
     pub month: String,
@@ -84,7 +80,6 @@ pub struct StatsResponse {
     pub rsvp_breakdown: RsvpBreakdown,
 }
 
-// ─── audit log ─────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct AuditEntry {
     pub id: i64,
@@ -108,6 +103,9 @@ pub struct RevertRequest {
 // USER HANDLERS
 // ═══════════════════════════════════════════════════════════════════════════
 
+#[utoipa::path(get, path = "/api/admin/users", tag = "Admin",
+    security(("bearer_auth" = [])),
+    responses((status = 200, body = Vec<UserPublic>), (status = 403, description = "Forbidden")))]
 pub async fn list_users(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -116,11 +114,13 @@ pub async fn list_users(
         r#"SELECT id, username, email, perms,
            "createdAt" AT TIME ZONE 'UTC' AS created_at
            FROM "Users" ORDER BY "createdAt" ASC"#
-    )
-    .fetch_all(&state.db).await?;
+    ).fetch_all(&state.db).await?;
     Ok(Json(users))
 }
 
+#[utoipa::path(post, path = "/api/admin/users", tag = "Admin",
+    security(("bearer_auth" = [])), request_body = CreateUserRequest,
+    responses((status = 200, body = UserPublic), (status = 409, description = "Conflict")))]
 pub async fn create_user(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -144,12 +144,14 @@ pub async fn create_user(
         r#"INSERT INTO "Users" (id, username, email, "passwordHash", perms)
            VALUES ($1,$2,$3,$4,$5)
            RETURNING id, username, email, perms, "createdAt" AT TIME ZONE 'UTC' AS created_at"#
-    )
-    .bind(&new_id).bind(&username).bind(&email).bind(&hash).bind(perms)
+    ).bind(&new_id).bind(&username).bind(&email).bind(&hash).bind(perms)
     .fetch_one(&state.db).await?;
     Ok(Json(user))
 }
 
+#[utoipa::path(put, path = "/api/admin/users", tag = "Admin",
+    security(("bearer_auth" = [])), request_body = UpdateUserRequest,
+    responses((status = 200, body = UserPublic), (status = 404, description = "Not found")))]
 pub async fn update_user(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -179,6 +181,10 @@ pub async fn update_user(
     Ok(Json(updated))
 }
 
+#[utoipa::path(delete, path = "/api/admin/users", tag = "Admin",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Query, description = "User ID")),
+    responses((status = 200, description = "Deleted"), (status = 404, description = "Not found")))]
 pub async fn delete_user(
     admin: AdminUser,
     State(state): State<AppState>,
@@ -195,6 +201,9 @@ pub async fn delete_user(
 // EVENT HANDLERS
 // ═══════════════════════════════════════════════════════════════════════════
 
+#[utoipa::path(get, path = "/api/admin/events", tag = "Admin",
+    security(("bearer_auth" = [])),
+    responses((status = 200, body = Vec<EventWithCreator>), (status = 403, description = "Forbidden")))]
 pub async fn list_events(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -210,12 +219,15 @@ pub async fn list_events(
     Ok(Json(events))
 }
 
+#[utoipa::path(delete, path = "/api/admin/events", tag = "Admin",
+    security(("bearer_auth" = [])),
+    params(("id" = i64, Query, description = "Event ID")),
+    responses((status = 200, description = "Deleted"), (status = 404, description = "Not found")))]
 pub async fn delete_event(
     admin: AdminUser,
     State(state): State<AppState>,
     Query(q): Query<EventIdQuery>,
 ) -> Result<Json<serde_json::Value>> {
-    // Snapshot before delete for audit revert
     let snapshot = sqlx::query_as::<_, EventWithCreator>(
         r#"SELECT e.id,e.title,e.description,e.date AT TIME ZONE 'UTC' AS date,
            e.location,e.color,e."createdBy" AS created_by,
@@ -233,13 +245,12 @@ pub async fn delete_event(
     sqlx::query(r#"DELETE FROM "Events" WHERE id=$1"#)
         .bind(q.id).execute(&state.db).await?;
 
-    // Write audit entry
     sqlx::query(
         r#"INSERT INTO "AuditLog" (actor_id,actor_name,action,entity_type,entity_id,entity_name,detail,snapshot)
            VALUES ($1,$2,'delete','event',$3,$4,'Admin deleted event',$5)"#
     )
     .bind(&admin.0.sub)
-    .bind(&admin.0.sub)  // actor_name fallback — ideally resolve username
+    .bind(&admin.0.sub)
     .bind(q.id.to_string())
     .bind(&entity_name)
     .bind(&snap_json)
@@ -252,6 +263,9 @@ pub async fn delete_event(
 // DISCORD CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 
+#[utoipa::path(get, path = "/api/admin/discord", tag = "Admin",
+    security(("bearer_auth" = [])),
+    responses((status = 200, body = DiscordConfig)))]
 pub async fn get_discord(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -259,7 +273,6 @@ pub async fn get_discord(
     let row = sqlx::query_scalar::<_, String>(
         r#"SELECT value FROM "Settings" WHERE key='discord'"#
     ).fetch_optional(&state.db).await?;
-
     let cfg = match row {
         Some(json) => serde_json::from_str(&json).unwrap_or_default(),
         None       => DiscordConfig::default(),
@@ -267,6 +280,9 @@ pub async fn get_discord(
     Ok(Json(cfg))
 }
 
+#[utoipa::path(post, path = "/api/admin/discord", tag = "Admin",
+    security(("bearer_auth" = [])), request_body = DiscordConfig,
+    responses((status = 200, description = "Saved")))]
 pub async fn save_discord(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -284,6 +300,9 @@ pub async fn save_discord(
 // STATS
 // ═══════════════════════════════════════════════════════════════════════════
 
+#[utoipa::path(get, path = "/api/admin/stats", tag = "Admin",
+    security(("bearer_auth" = [])),
+    responses((status = 200, body = StatsResponse)))]
 pub async fn get_stats(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -319,6 +338,9 @@ pub async fn get_stats(
 // AUDIT LOG
 // ═══════════════════════════════════════════════════════════════════════════
 
+#[utoipa::path(get, path = "/api/admin/audit", tag = "Admin",
+    security(("bearer_auth" = [])),
+    responses((status = 200, body = Vec<AuditEntry>)))]
 pub async fn list_audit(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -331,6 +353,9 @@ pub async fn list_audit(
     Ok(Json(entries))
 }
 
+#[utoipa::path(post, path = "/api/admin/audit/revert", tag = "Admin",
+    security(("bearer_auth" = [])), request_body = RevertRequest,
+    responses((status = 200, description = "Reverted"), (status = 400, description = "Bad request")))]
 pub async fn revert_audit(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -365,7 +390,6 @@ pub async fn revert_audit(
     .bind(ev.private)
     .execute(&state.db).await?;
 
-    // Mark audit entry as reverted
     sqlx::query(r#"UPDATE "AuditLog" SET detail=detail||' [REVERTED]' WHERE id=$1"#)
         .bind(body.audit_id).execute(&state.db).await?;
 
