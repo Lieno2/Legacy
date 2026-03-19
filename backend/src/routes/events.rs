@@ -48,8 +48,11 @@ pub async fn list(
 ) -> Result<Json<Vec<EventWithCreator>>> {
     let events = sqlx::query_as::<_, EventWithCreator>(
         r#"
-        SELECT e.id, e.title, e.description, e.date, e.location, e.color,
-               e."createdBy" AS created_by, e."createdAt" AS created_at,
+        SELECT e.id, e.title, e.description,
+               e.date AT TIME ZONE 'UTC' AS date,
+               e.location, e.color,
+               e."createdBy" AS created_by,
+               e."createdAt" AT TIME ZONE 'UTC' AS created_at,
                e.private, u.username AS creator_name
         FROM "Events" e
         LEFT JOIN "Users" u ON e."createdBy" = u.id
@@ -57,8 +60,11 @@ pub async fn list(
 
         UNION
 
-        SELECT e.id, e.title, e.description, e.date, e.location, e.color,
-               e."createdBy" AS created_by, e."createdAt" AS created_at,
+        SELECT e.id, e.title, e.description,
+               e.date AT TIME ZONE 'UTC' AS date,
+               e.location, e.color,
+               e."createdBy" AS created_by,
+               e."createdAt" AT TIME ZONE 'UTC' AS created_at,
                e.private, u.username AS creator_name
         FROM "EventMembers" em
         INNER JOIN "Events" e ON em."eventId" = e.id
@@ -104,8 +110,11 @@ pub async fn create(
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
         )
-        SELECT i.id, i.title, i.description, i.date, i.location, i.color,
-               i."createdBy" AS created_by, i."createdAt" AS created_at,
+        SELECT i.id, i.title, i.description,
+               i.date AT TIME ZONE 'UTC' AS date,
+               i.location, i.color,
+               i."createdBy" AS created_by,
+               i."createdAt" AT TIME ZONE 'UTC' AS created_at,
                i.private, u.username AS creator_name
         FROM inserted i
         LEFT JOIN "Users" u ON i."createdBy" = u.id
@@ -155,8 +164,11 @@ pub async fn update(
             WHERE id = $7 AND "createdBy" = $8
             RETURNING *
         )
-        SELECT u.id, u.title, u.description, u.date, u.location, u.color,
-               u."createdBy" AS created_by, u."createdAt" AS created_at,
+        SELECT u.id, u.title, u.description,
+               u.date AT TIME ZONE 'UTC' AS date,
+               u.location, u.color,
+               u."createdBy" AS created_by,
+               u."createdAt" AT TIME ZONE 'UTC' AS created_at,
                u.private, usr.username AS creator_name
         FROM updated u
         LEFT JOIN "Users" usr ON u."createdBy" = usr.id

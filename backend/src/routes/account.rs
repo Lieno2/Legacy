@@ -38,7 +38,9 @@ pub async fn get_profile(
     State(state): State<AppState>,
 ) -> Result<Json<UserPublic>> {
     let user = sqlx::query_as::<_, UserPublic>(
-        r#"SELECT id, username, email, perms, "createdAt" AS created_at FROM "Users" WHERE id = $1"#
+        r#"SELECT id, username, email, perms,
+           "createdAt" AT TIME ZONE 'UTC' AS created_at
+           FROM "Users" WHERE id = $1"#
     )
     .bind(&auth.0.sub)
     .fetch_optional(&state.db)
@@ -124,7 +126,8 @@ pub async fn update_profile(
         sqlx::query_as::<_, UserPublic>(
             r#"UPDATE "Users" SET username = $1, email = $2, "passwordHash" = $3
                WHERE id = $4
-               RETURNING id, username, email, perms, "createdAt" AS created_at"#
+               RETURNING id, username, email, perms,
+               "createdAt" AT TIME ZONE 'UTC' AS created_at"#
         )
         .bind(&username)
         .bind(&email)
@@ -136,7 +139,8 @@ pub async fn update_profile(
         sqlx::query_as::<_, UserPublic>(
             r#"UPDATE "Users" SET username = $1, email = $2
                WHERE id = $3
-               RETURNING id, username, email, perms, "createdAt" AS created_at"#
+               RETURNING id, username, email, perms,
+               "createdAt" AT TIME ZONE 'UTC' AS created_at"#
         )
         .bind(&username)
         .bind(&email)

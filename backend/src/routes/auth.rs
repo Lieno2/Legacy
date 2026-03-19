@@ -50,7 +50,9 @@ pub async fn login(
     tracing::debug!("[LOGIN] Attempt for email: {}", body.email);
 
     let user = sqlx::query_as::<_, User>(
-        r#"SELECT id, username, email, "passwordHash" AS password_hash, perms, "createdAt" AS created_at FROM "Users" WHERE email = $1"#
+        r#"SELECT id, username, email, "passwordHash" AS password_hash, perms,
+           "createdAt" AT TIME ZONE 'UTC' AS created_at
+           FROM "Users" WHERE email = $1"#
     )
     .bind(&body.email)
     .fetch_optional(&state.db)
@@ -134,7 +136,9 @@ pub async fn refresh(
     let user_id = validate_refresh_token(&state.redis, &body.refresh_token).await?;
 
     let user = sqlx::query_as::<_, User>(
-        r#"SELECT id, username, email, "passwordHash" AS password_hash, perms, "createdAt" AS created_at FROM "Users" WHERE id = $1"#
+        r#"SELECT id, username, email, "passwordHash" AS password_hash, perms,
+           "createdAt" AT TIME ZONE 'UTC' AS created_at
+           FROM "Users" WHERE id = $1"#
     )
     .bind(&user_id)
     .fetch_optional(&state.db)
@@ -163,7 +167,9 @@ pub async fn me(
     State(state): State<AppState>,
 ) -> Result<Json<UserPublic>> {
     let user = sqlx::query_as::<_, UserPublic>(
-        r#"SELECT id, username, email, perms, "createdAt" AS created_at FROM "Users" WHERE id = $1"#
+        r#"SELECT id, username, email, perms,
+           "createdAt" AT TIME ZONE 'UTC' AS created_at
+           FROM "Users" WHERE id = $1"#
     )
     .bind(&auth.0.sub)
     .fetch_optional(&state.db)

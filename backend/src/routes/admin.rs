@@ -52,7 +52,9 @@ pub async fn list_users(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserPublic>>> {
     let users = sqlx::query_as::<_, UserPublic>(
-        r#"SELECT id, username, email, perms, "createdAt" AS created_at FROM "Users" ORDER BY "createdAt" ASC"#
+        r#"SELECT id, username, email, perms,
+           "createdAt" AT TIME ZONE 'UTC' AS created_at
+           FROM "Users" ORDER BY "createdAt" ASC"#
     )
     .fetch_all(&state.db)
     .await?;
@@ -102,7 +104,8 @@ pub async fn create_user(
     let user = sqlx::query_as::<_, UserPublic>(
         r#"INSERT INTO "Users" (id, username, email, "passwordHash", perms)
            VALUES ($1, $2, $3, $4, $5)
-           RETURNING id, username, email, perms, "createdAt" AS created_at"#
+           RETURNING id, username, email, perms,
+           "createdAt" AT TIME ZONE 'UTC' AS created_at"#
     )
     .bind(&new_id)
     .bind(&username)
@@ -149,7 +152,8 @@ pub async fn update_user(
         sqlx::query_as::<_, UserPublic>(
             r#"UPDATE "Users" SET username = $1, email = $2, perms = $3, "passwordHash" = $4
                WHERE id = $5
-               RETURNING id, username, email, perms, "createdAt" AS created_at"#
+               RETURNING id, username, email, perms,
+               "createdAt" AT TIME ZONE 'UTC' AS created_at"#
         )
         .bind(&username)
         .bind(&email)
@@ -163,7 +167,8 @@ pub async fn update_user(
         sqlx::query_as::<_, UserPublic>(
             r#"UPDATE "Users" SET username = $1, email = $2, perms = $3
                WHERE id = $4
-               RETURNING id, username, email, perms, "createdAt" AS created_at"#
+               RETURNING id, username, email, perms,
+               "createdAt" AT TIME ZONE 'UTC' AS created_at"#
         )
         .bind(&username)
         .bind(&email)
@@ -227,8 +232,9 @@ pub async fn list_events(
 ) -> Result<Json<Vec<EventWithCreator>>> {
     let events = sqlx::query_as::<_, EventWithCreator>(
         r#"
-        SELECT e.id, e.title, e.description, e.date, e.location, e.color,
-               e."createdBy" AS created_by, e."createdAt" AS created_at,
+        SELECT e.id, e.title, e.description, e.date AT TIME ZONE 'UTC' AS date,
+               e.location, e.color, e."createdBy" AS created_by,
+               e."createdAt" AT TIME ZONE 'UTC' AS created_at,
                e.private, u.username AS creator_name
         FROM "Events" e
         LEFT JOIN "Users" u ON e."createdBy" = u.id
