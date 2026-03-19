@@ -4,17 +4,14 @@ pub mod discord;
 pub mod stats;
 pub mod audit;
 
-// Re-export all handlers so existing call-sites in routes/mod.rs and main.rs
-// continue to work unchanged via `admin::*`.
+// Re-export handlers so routes/mod.rs call-sites stay unchanged
 pub use users::{list_users, create_user, update_user, delete_user};
 pub use events::{list_events, delete_event};
 pub use discord::{get_discord, save_discord};
 pub use stats::get_stats;
 pub use audit::{list_audit, revert_audit};
 
-// ── Shared types (used across sub-modules & re-exported for main.rs OpenAPI) ──
-
-use axum::extract::Query;
+// ── Shared types ────────────────────────────────────────────────────────────
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
