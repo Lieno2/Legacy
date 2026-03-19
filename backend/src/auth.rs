@@ -1,8 +1,8 @@
 use crate::{config::Config, error::{AppError, Result}, models::Claims};
 use axum::{
     async_trait,
-    extract::{FromRequestParts, State},
-    http::{request::Parts, HeaderMap},
+    extract::FromRequestParts,
+    http::request::Parts,
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use chrono::Utc;
@@ -32,7 +32,6 @@ pub fn generate_refresh_token() -> String {
     Uuid::new_v4().to_string()
 }
 
-// Store refresh token in Redis: key = "refresh:{token}", value = user_id
 pub async fn store_refresh_token(
     redis: &redis::Client,
     token: &str,
@@ -41,11 +40,10 @@ pub async fn store_refresh_token(
 ) -> Result<()> {
     let mut conn = redis.get_multiplexed_async_connection().await?;
     let key = format!("refresh:{}", token);
-    conn.set_ex(key, user_id, expiry_secs).await?;
+    conn.set_ex::<_, _, ()>(key, user_id, expiry_secs).await?;
     Ok(())
 }
 
-// Validate refresh token from Redis, returning user_id if valid
 pub async fn validate_refresh_token(
     redis: &redis::Client,
     token: &str,
@@ -56,11 +54,10 @@ pub async fn validate_refresh_token(
     user_id.ok_or(AppError::Unauthorized)
 }
 
-// Delete refresh token from Redis (logout)
 pub async fn revoke_refresh_token(redis: &redis::Client, token: &str) -> Result<()> {
     let mut conn = redis.get_multiplexed_async_connection().await?;
     let key = format!("refresh:{}", token);
-    conn.del(key).await?;
+    conn.del::<_, ()>(key).await?;
     Ok(())
 }
 
@@ -108,7 +105,6 @@ where
     }
 }
 
-// Admin-only extractor
 #[derive(Debug, Clone)]
 pub struct AdminUser(pub Claims);
 
