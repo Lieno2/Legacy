@@ -52,11 +52,17 @@
   let statsLoading = false;
 
   // ── audit ─────────────────────────────────────────────────────────────────
+  // Fields match the backend AuditEntry struct (camelCase DB columns aliased to snake_case)
   interface AuditEntry {
-    id: number; actor_id: string | null; actor_name: string | null;
-    action: string; entity_type: string; entity_id: string | null;
-    entity_name: string | null; detail: string | null;
-    snapshot: unknown; created_at: string;
+    id: number;
+    user_id: string | null;
+    username: string | null;
+    action: string;
+    target_type: string | null;
+    target_id: string | null;
+    target_name: string | null;
+    metadata: Record<string, unknown> | null;
+    created_at: string;
   }
   let audit: AuditEntry[] = [];
   let auditLoading = false;
@@ -359,7 +365,6 @@
     <!-- ════ DISCORD ════ -->
     {#if tab === 'discord'}
       <div class="flex flex-col gap-4">
-        <!-- Header card -->
         <div class="bg-card border border-border rounded-2xl p-5 flex items-center gap-4">
           <div class="w-11 h-11 rounded-2xl bg-[#5865f2]/10 border border-[#5865f2]/20 flex items-center justify-center shrink-0">
             <Hash class="w-5 h-5 text-[#5865f2]" />
@@ -368,7 +373,6 @@
             <h2 class="font-semibold text-sm">Discord Webhook</h2>
             <p class="text-xs text-muted-foreground mt-0.5">Send notifications to a Discord channel when events are created, updated or deleted.</p>
           </div>
-          <!-- Enable toggle -->
           <label class="flex items-center gap-2 cursor-pointer shrink-0">
             <span class="text-xs text-muted-foreground">{discord.enabled ? 'On' : 'Off'}</span>
             <div class="relative">
@@ -379,15 +383,11 @@
           </label>
         </div>
 
-        <!-- Webhook URL -->
         <div class="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
             <Webhook class="w-3.5 h-3.5" /> Webhook URL
           </label>
-          <input class={INPUT} bind:value={discord.webhook_url}
-            placeholder="https://discord.com/api/webhooks/..." />
-
-          <!-- Format toggle -->
+          <input class={INPUT} bind:value={discord.webhook_url} placeholder="https://discord.com/api/webhooks/..." />
           <div class="flex flex-col gap-1.5 pt-1">
             <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Message Format</span>
             <div class="grid grid-cols-2 gap-2">
@@ -405,7 +405,6 @@
           </div>
         </div>
 
-        <!-- Message templates -->
         <div class="bg-card border border-border rounded-2xl p-5 flex flex-col gap-4">
           <div>
             <h3 class="text-sm font-semibold">Message Templates</h3>
@@ -417,11 +416,10 @@
               <code class="bg-muted px-1 py-0.5 rounded text-[11px]">&#123;event.creator&#125;</code>
             </p>
           </div>
-
           {#each [
-            { key: 'msg_created' as const, label: '✅ Event Created',  emoji: '📅' },
-            { key: 'msg_updated' as const, label: '✏️ Event Updated',  emoji: '✏️' },
-            { key: 'msg_deleted' as const, label: '🗑️ Event Deleted',  emoji: '🗑️' },
+            { key: 'msg_created' as const, label: '✅ Event Created', emoji: '📅' },
+            { key: 'msg_updated' as const, label: '✏️ Event Updated', emoji: '✏️' },
+            { key: 'msg_deleted' as const, label: '🗑️ Event Deleted', emoji: '🗑️' },
           ] as tpl}
             <div class="flex flex-col gap-1.5">
               <label class="text-xs font-medium text-muted-foreground">{tpl.label}</label>
@@ -432,7 +430,6 @@
           {/each}
         </div>
 
-        <!-- Save -->
         <button on:click={saveDiscord} disabled={discordSaving}
           class="h-10 rounded-xl font-semibold text-sm transition active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2
                  {discordSaved ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-[#5865f2] text-white hover:bg-[#4752c4]'}">
@@ -455,8 +452,6 @@
         </div>
       {:else if stats}
         <div class="flex flex-col gap-4">
-
-          <!-- Events per month bar chart -->
           <div class="bg-card border border-border rounded-2xl p-5">
             <h2 class="font-semibold text-sm mb-4">Events per Month <span class="text-muted-foreground font-normal">(last 12 months)</span></h2>
             {#if stats.events_per_month.length === 0}
@@ -476,10 +471,7 @@
             {/if}
           </div>
 
-          <!-- Bottom two cards -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-            <!-- Most active users -->
             <div class="bg-card border border-border rounded-2xl p-5">
               <div class="flex items-center gap-2 mb-4">
                 <UserCheck class="w-4 h-4 text-muted-foreground" />
@@ -505,7 +497,6 @@
               {/if}
             </div>
 
-            <!-- RSVP breakdown -->
             <div class="bg-card border border-border rounded-2xl p-5">
               <div class="flex items-center gap-2 mb-4">
                 <BarChart2 class="w-4 h-4 text-muted-foreground" />
@@ -567,27 +558,22 @@
             <div class="py-10 text-center text-sm text-muted-foreground">No audit entries yet.</div>
           {:else}
             {#each audit as entry}
-              {@const isReverted = entry.detail?.includes('[REVERTED]') ?? false}
+              {@const isReverted = entry.metadata?.reverted === true}
               <div class="flex items-start gap-3 px-5 py-3 hover:bg-muted/20 transition">
-                <!-- Action badge -->
                 <span class="shrink-0 mt-0.5 inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full border uppercase tracking-wide
                              {ACTION_STYLE[entry.action] ?? 'bg-muted text-muted-foreground border-border'}">
                   {entry.action}
                 </span>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm">
-                    <span class="font-medium">{entry.actor_name ?? 'System'}</span>
+                    <span class="font-medium">{entry.username ?? 'System'}</span>
                     <span class="text-muted-foreground"> {entry.action}d </span>
-                    <span class="font-medium">{entry.entity_name ?? entry.entity_id ?? '—'}</span>
+                    <span class="font-medium">{entry.target_name ?? entry.target_id ?? '—'}</span>
                     {#if isReverted}<span class="ml-1 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">reverted</span>{/if}
                   </p>
-                  {#if entry.detail && !isReverted}
-                    <p class="text-xs text-muted-foreground truncate">{entry.detail}</p>
-                  {/if}
                   <p class="text-[11px] text-muted-foreground/60 mt-0.5">{timeAgo(entry.created_at)}</p>
                 </div>
-                <!-- Revert button (only for non-reverted deletes) -->
-                {#if entry.action === 'delete' && entry.entity_type === 'event' && !isReverted && entry.snapshot}
+                {#if entry.action === 'delete' && entry.target_type === 'event' && !isReverted && entry.metadata}
                   <button
                     on:click={() => revertAudit(entry.id)}
                     disabled={reverting === entry.id}
