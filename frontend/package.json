@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "bun run db:seed && next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:seed": "bun run scripts/init-db.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
