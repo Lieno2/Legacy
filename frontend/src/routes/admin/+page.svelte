@@ -42,6 +42,7 @@
     msg_deleted: '🗑️ **{event.title}** (was on {event.date}) has been deleted by {event.creator}.',
   };
   let discordLoading = false, discordSaving = false, discordSaved = false;
+  let discordLoaded = false;
 
   // ── stats ─────────────────────────────────────────────────────────────────
   interface MonthStat   { month: string; count: number }
@@ -50,9 +51,9 @@
   interface StatsData   { events_per_month: MonthStat[]; most_active_users: ActiveUser[]; rsvp_breakdown: RsvpBreak }
   let stats: StatsData | null = null;
   let statsLoading = false;
+  let statsLoaded = false;
 
   // ── audit ─────────────────────────────────────────────────────────────────
-  // Fields match the backend AuditEntry struct (camelCase DB columns aliased to snake_case)
   interface AuditEntry {
     id: number;
     user_id: string | null;
@@ -66,14 +67,30 @@
   }
   let audit: AuditEntry[] = [];
   let auditLoading = false;
+  let auditLoaded = false;
   let reverting: number | null = null;
+
+  // ── auth ready flag ───────────────────────────────────────────────────────
+  // True once the layout has finished the /api/auth/me call
+  let authReady = false;
+  $: if (!$auth.loading) authReady = true;
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
   onMount(async () => {
+    // Wait until auth store is resolved before doing anything
+    await waitForAuth();
     if (($auth.user?.perms ?? 0) < 999) { goto('/calendar'); return; }
     fetchUsers();
     fetchEvents();
   });
+
+  function waitForAuth(): Promise<void> {
+    return new Promise(resolve => {
+      const unsub = auth.subscribe(a => {
+        if (!a.loading) { unsub(); resolve(); }
+      });
+    });
+  }
 
   async function fetchUsers()  { usersLoading  = true; try { users  = await apiFetch<User[]>('/api/admin/users');  } finally { usersLoading  = false; } }
   async function fetchEvents() { eventsLoading = true; try { events = await apiFetch<Event[]>('/api/admin/events'); } finally { eventsLoading = false; } }
@@ -81,7 +98,7 @@
   async function loadDiscord() {
     if (discordLoading) return;
     discordLoading = true;
-    try { discord = await apiFetch<DiscordConfig>('/api/admin/discord'); } catch { /* use defaults */ }
+    try { discord = await apiFetch<DiscordConfig>('/api/admin/discord'); discordLoaded = true; } catch { /* use defaults */ }
     finally { discordLoading = false; }
   }
 
@@ -98,14 +115,14 @@
   async function loadStats() {
     if (statsLoading) return;
     statsLoading = true;
-    try { stats = await apiFetch<StatsData>('/api/admin/stats'); } catch { }
+    try { stats = await apiFetch<StatsData>('/api/admin/stats'); statsLoaded = true; } catch { }
     finally { statsLoading = false; }
   }
 
   async function loadAudit() {
     if (auditLoading) return;
     auditLoading = true;
-    try { audit = await apiFetch<AuditEntry[]>('/api/admin/audit'); } catch { }
+    try { audit = await apiFetch<AuditEntry[]>('/api/admin/audit'); auditLoaded = true; } catch { }
     finally { auditLoading = false; }
   }
 
@@ -119,10 +136,10 @@
     finally { reverting = null; }
   }
 
-  // lazy-load per tab
-  $: if (tab === 'discord' && !discordLoading) loadDiscord();
-  $: if (tab === 'stats'   && !statsLoading)   loadStats();
-  $: if (tab === 'audit'   && !auditLoading)   loadAudit();
+  // Lazy-load per tab — only fires once authReady is true and data not yet loaded
+  $: if (authReady && tab === 'discord' && !discordLoaded && !discordLoading) loadDiscord();
+  $: if (authReady && tab === 'stats'   && !statsLoaded   && !statsLoading)   loadStats();
+  $: if (authReady && tab === 'audit'   && !auditLoaded   && !auditLoading)   loadAudit();
 
   // ── user CRUD ─────────────────────────────────────────────────────────────
   function openCreateUser() { editingUser = null; userForm = { username: '', email: '', password: '', perms: 0 }; userError = ''; showPw = false; userDialogOpen = true; }
@@ -364,84 +381,90 @@
 
     <!-- ════ DISCORD ════ -->
     {#if tab === 'discord'}
-      <div class="flex flex-col gap-4">
-        <div class="bg-card border border-border rounded-2xl p-5 flex items-center gap-4">
-          <div class="w-11 h-11 rounded-2xl bg-[#5865f2]/10 border border-[#5865f2]/20 flex items-center justify-center shrink-0">
-            <Hash class="w-5 h-5 text-[#5865f2]" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <h2 class="font-semibold text-sm">Discord Webhook</h2>
-            <p class="text-xs text-muted-foreground mt-0.5">Send notifications to a Discord channel when events are created, updated or deleted.</p>
-          </div>
-          <label class="flex items-center gap-2 cursor-pointer shrink-0">
-            <span class="text-xs text-muted-foreground">{discord.enabled ? 'On' : 'Off'}</span>
-            <div class="relative">
-              <input type="checkbox" bind:checked={discord.enabled} class="sr-only peer" />
-              <div class="w-9 h-5 rounded-full border transition-colors bg-muted border-border peer-checked:bg-[#5865f2] peer-checked:border-[#5865f2]"></div>
-              <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4"></div>
-            </div>
-          </label>
+      {#if discordLoading}
+        <div class="flex items-center justify-center gap-2 py-16 text-muted-foreground">
+          <Loader2 class="w-5 h-5 animate-spin" /> Loading Discord settings…
         </div>
+      {:else}
+        <div class="flex flex-col gap-4">
+          <div class="bg-card border border-border rounded-2xl p-5 flex items-center gap-4">
+            <div class="w-11 h-11 rounded-2xl bg-[#5865f2]/10 border border-[#5865f2]/20 flex items-center justify-center shrink-0">
+              <Hash class="w-5 h-5 text-[#5865f2]" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <h2 class="font-semibold text-sm">Discord Webhook</h2>
+              <p class="text-xs text-muted-foreground mt-0.5">Send notifications to a Discord channel when events are created, updated or deleted.</p>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer shrink-0">
+              <span class="text-xs text-muted-foreground">{discord.enabled ? 'On' : 'Off'}</span>
+              <div class="relative">
+                <input type="checkbox" bind:checked={discord.enabled} class="sr-only peer" />
+                <div class="w-9 h-5 rounded-full border transition-colors bg-muted border-border peer-checked:bg-[#5865f2] peer-checked:border-[#5865f2]"></div>
+                <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4"></div>
+              </div>
+            </label>
+          </div>
 
-        <div class="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-            <Webhook class="w-3.5 h-3.5" /> Webhook URL
-          </label>
-          <input class={INPUT} bind:value={discord.webhook_url} placeholder="https://discord.com/api/webhooks/..." />
-          <div class="flex flex-col gap-1.5 pt-1">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Message Format</span>
-            <div class="grid grid-cols-2 gap-2">
-              <button type="button" on:click={() => (discord.format = 'embed')}
-                class="h-9 rounded-xl border text-sm font-medium transition
-                       {discord.format === 'embed' ? 'border-[#5865f2]/50 bg-[#5865f2]/10 text-[#5865f2]' : 'border-border text-muted-foreground hover:bg-muted'}">
-                Embed
-              </button>
-              <button type="button" on:click={() => (discord.format = 'plain')}
-                class="h-9 rounded-xl border text-sm font-medium transition
-                       {discord.format === 'plain' ? 'border-[#5865f2]/50 bg-[#5865f2]/10 text-[#5865f2]' : 'border-border text-muted-foreground hover:bg-muted'}">
-                Plain Text
-              </button>
+          <div class="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3">
+            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Webhook class="w-3.5 h-3.5" /> Webhook URL
+            </label>
+            <input class={INPUT} bind:value={discord.webhook_url} placeholder="https://discord.com/api/webhooks/..." />
+            <div class="flex flex-col gap-1.5 pt-1">
+              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Message Format</span>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" on:click={() => (discord.format = 'embed')}
+                  class="h-9 rounded-xl border text-sm font-medium transition
+                         {discord.format === 'embed' ? 'border-[#5865f2]/50 bg-[#5865f2]/10 text-[#5865f2]' : 'border-border text-muted-foreground hover:bg-muted'}">
+                  Embed
+                </button>
+                <button type="button" on:click={() => (discord.format = 'plain')}
+                  class="h-9 rounded-xl border text-sm font-medium transition
+                         {discord.format === 'plain' ? 'border-[#5865f2]/50 bg-[#5865f2]/10 text-[#5865f2]' : 'border-border text-muted-foreground hover:bg-muted'}">
+                  Plain Text
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="bg-card border border-border rounded-2xl p-5 flex flex-col gap-4">
-          <div>
-            <h3 class="text-sm font-semibold">Message Templates</h3>
-            <p class="text-xs text-muted-foreground mt-0.5">
-              Available placeholders:
-              <code class="bg-muted px-1 py-0.5 rounded text-[11px]">&#123;event.title&#125;</code>
-              <code class="bg-muted px-1 py-0.5 rounded text-[11px]">&#123;event.date&#125;</code>
-              <code class="bg-muted px-1 py-0.5 rounded text-[11px]">&#123;event.location&#125;</code>
-              <code class="bg-muted px-1 py-0.5 rounded text-[11px]">&#123;event.creator&#125;</code>
-            </p>
-          </div>
-          {#each [
-            { key: 'msg_created' as const, label: '✅ Event Created', emoji: '📅' },
-            { key: 'msg_updated' as const, label: '✏️ Event Updated', emoji: '✏️' },
-            { key: 'msg_deleted' as const, label: '🗑️ Event Deleted', emoji: '🗑️' },
-          ] as tpl}
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-medium text-muted-foreground">{tpl.label}</label>
-              <textarea class="{TEXTAREA} h-20" bind:value={discord[tpl.key]}
-                placeholder="{tpl.emoji} Message for {tpl.label.toLowerCase()}..."
-              ></textarea>
+          <div class="bg-card border border-border rounded-2xl p-5 flex flex-col gap-4">
+            <div>
+              <h3 class="text-sm font-semibold">Message Templates</h3>
+              <p class="text-xs text-muted-foreground mt-0.5">
+                Available placeholders:
+                <code class="bg-muted px-1 py-0.5 rounded text-[11px]">&#123;event.title&#125;</code>
+                <code class="bg-muted px-1 py-0.5 rounded text-[11px]">&#123;event.date&#125;</code>
+                <code class="bg-muted px-1 py-0.5 rounded text-[11px]">&#123;event.location&#125;</code>
+                <code class="bg-muted px-1 py-0.5 rounded text-[11px]">&#123;event.creator&#125;</code>
+              </p>
             </div>
-          {/each}
-        </div>
+            {#each [
+              { key: 'msg_created' as const, label: '✅ Event Created', emoji: '📅' },
+              { key: 'msg_updated' as const, label: '✏️ Event Updated', emoji: '✏️' },
+              { key: 'msg_deleted' as const, label: '🗑️ Event Deleted', emoji: '🗑️' },
+            ] as tpl}
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-medium text-muted-foreground">{tpl.label}</label>
+                <textarea class="{TEXTAREA} h-20" bind:value={discord[tpl.key]}
+                  placeholder="{tpl.emoji} Message for {tpl.label.toLowerCase()}..."
+                ></textarea>
+              </div>
+            {/each}
+          </div>
 
-        <button on:click={saveDiscord} disabled={discordSaving}
-          class="h-10 rounded-xl font-semibold text-sm transition active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2
-                 {discordSaved ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-[#5865f2] text-white hover:bg-[#4752c4]'}">
-          {#if discordSaving}
-            <Loader2 class="w-4 h-4 animate-spin" /> Saving…
-          {:else if discordSaved}
-            <CheckCircle2 class="w-4 h-4" /> Saved!
-          {:else}
-            <Save class="w-4 h-4" /> Save Discord Settings
-          {/if}
-        </button>
-      </div>
+          <button on:click={saveDiscord} disabled={discordSaving}
+            class="h-10 rounded-xl font-semibold text-sm transition active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2
+                   {discordSaved ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-[#5865f2] text-white hover:bg-[#4752c4]'}">
+            {#if discordSaving}
+              <Loader2 class="w-4 h-4 animate-spin" /> Saving…
+            {:else if discordSaved}
+              <CheckCircle2 class="w-4 h-4" /> Saved!
+            {:else}
+              <Save class="w-4 h-4" /> Save Discord Settings
+            {/if}
+          </button>
+        </div>
+      {/if}
     {/if}
 
     <!-- ════ STATS ════ -->
@@ -533,6 +556,8 @@
             </div>
           </div>
         </div>
+      {:else}
+        <div class="py-16 text-center text-sm text-muted-foreground">Failed to load stats. <button on:click={() => { statsLoaded = false; }} class="underline hover:text-foreground transition">Retry</button></div>
       {/if}
     {/if}
 
@@ -544,7 +569,7 @@
             <h2 class="font-semibold text-sm">Audit Log</h2>
             <p class="text-xs text-muted-foreground mt-0.5">Last 200 actions. Deleted events can be reverted.</p>
           </div>
-          <button on:click={loadAudit} disabled={auditLoading}
+          <button on:click={() => { auditLoaded = false; }}  disabled={auditLoading}
             class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition disabled:opacity-40">
             <RotateCcw class="w-3.5 h-3.5 {auditLoading ? 'animate-spin' : ''}" />
           </button>
