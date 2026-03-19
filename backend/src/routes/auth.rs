@@ -47,23 +47,43 @@ pub async fn login(
     State(state): State<AppState>,
     Json(body): Json<LoginRequest>,
 ) -> Result<Json<AuthResponse>> {
+    tracing::debug!("[LOGIN] Attempt for email: {}", body.email);
+
     let user = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, "passwordHash" AS password_hash, perms, "createdAt" AS created_at FROM "Users" WHERE email = $1"#
     )
     .bind(&body.email)
     .fetch_optional(&state.db)
-    .await?
-    .ok_or(AppError::Unauthorized)?;
+    .await
+    .map_err(|e| { tracing::error!("[LOGIN] DB error fetching user: {}", e); e })?;
+
+    let user = match user {
+        Some(u) => {
+            tracing::debug!("[LOGIN] User found: id={} perms={}", u.id, u.perms);
+            u
+        }
+        None => {
+            tracing::warn!("[LOGIN] No user found for email: {}", body.email);
+            return Err(AppError::Unauthorized);
+        }
+    };
 
     let valid = bcrypt::verify(&body.password, &user.password_hash)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
+        .map_err(|e| { tracing::error!("[LOGIN] bcrypt error: {}", e); AppError::Internal(anyhow::anyhow!(e)) })?;
+
     if !valid {
+        tracing::warn!("[LOGIN] Wrong password for email: {}", body.email);
         return Err(AppError::Unauthorized);
     }
 
+    tracing::debug!("[LOGIN] Password valid, generating tokens");
+
     let access_token = generate_access_token(&user.id, &user.email, user.perms, &state.cfg)?;
     let refresh_token = generate_refresh_token();
-    store_refresh_token(&state.redis, &refresh_token, &user.id, state.cfg.refresh_token_expiry_secs).await?;
+    store_refresh_token(&state.redis, &refresh_token, &user.id, state.cfg.refresh_token_expiry_secs).await
+        .map_err(|e| { tracing::error!("[LOGIN] Redis error storing refresh token: {}", e); e })?;
+
+    tracing::info!("[LOGIN] ✅ Success for email: {}", body.email);
 
     Ok(Json(AuthResponse {
         access_token,

@@ -11,13 +11,21 @@ pub async fn run_setup(db: &PgPool, cfg: &Config) {
             }
         };
 
+        // First ensure no stale setup-account id row blocks us
+        let _ = sqlx::query(r#"DELETE FROM "Users" WHERE id = 'setup-account' AND email != $1"#)
+            .bind(&cfg.setup_account_email)
+            .execute(db)
+            .await;
+
         let result = sqlx::query(
             r#"
             INSERT INTO "Users" (id, username, email, "passwordHash", perms)
             VALUES ('setup-account', 'Setup Admin', $1, $2, 999)
-            ON CONFLICT (id) DO UPDATE
-                SET email = EXCLUDED.email,
-                    "passwordHash" = EXCLUDED."passwordHash"
+            ON CONFLICT (email) DO UPDATE
+                SET id = 'setup-account',
+                    username = 'Setup Admin',
+                    "passwordHash" = EXCLUDED."passwordHash",
+                    perms = 999
             "#
         )
         .bind(&cfg.setup_account_email)
@@ -26,11 +34,10 @@ pub async fn run_setup(db: &PgPool, cfg: &Config) {
         .await;
 
         match result {
-            Ok(_) => tracing::info!("Setup account enabled: {}", cfg.setup_account_email),
+            Ok(_) => tracing::info!("✅ Setup account ready: {}", cfg.setup_account_email),
             Err(e) => tracing::error!("Setup account: failed to upsert user: {}", e),
         }
     } else {
-        // Remove setup account if it exists
         let result = sqlx::query(r#"DELETE FROM "Users" WHERE id = 'setup-account'"#)
             .execute(db)
             .await;
