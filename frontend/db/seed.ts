@@ -3,10 +3,16 @@ import { users } from "./schema"
 import { eq } from "drizzle-orm"
 import bcrypt from "bcryptjs"
 
+const LOCAL_AUTH_ENABLED = process.env.LOCAL_AUTH_ENABLED !== "false"
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@legacy.local"
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"
 
 export async function seedAdminUser() {
+    if (!LOCAL_AUTH_ENABLED) {
+        console.log("⊘ Local authentication disabled (LOCAL_AUTH_ENABLED=false)")
+        return null
+    }
+
     try {
         // Check if admin user already exists
         const existingAdmin = await db
