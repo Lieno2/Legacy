@@ -87,16 +87,27 @@ pub async fn upsert(
 
     let late_minutes = if body.status == "late" { body.late_minutes } else { None };
 
+    // Resolve the username for the denormalized column
+    let username: Option<String> = sqlx::query_scalar(
+        r#"SELECT username FROM "Users" WHERE id = $1"#
+    )
+    .bind(&auth.0.sub)
+    .fetch_optional(&state.db)
+    .await?;
+
     sqlx::query(
         r#"
-        INSERT INTO "EventMembers" ("eventId", "userId", status, "lateMinutes")
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO "EventMembers" ("eventId", "userId", username, status, "lateMinutes")
+        VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT ("eventId", "userId") DO UPDATE
-            SET status = EXCLUDED.status, "lateMinutes" = EXCLUDED."lateMinutes"
+            SET username      = EXCLUDED.username,
+                status        = EXCLUDED.status,
+                "lateMinutes" = EXCLUDED."lateMinutes"
         "#
     )
     .bind(body.event_id)
     .bind(&auth.0.sub)
+    .bind(&username)
     .bind(&body.status)
     .bind(late_minutes)
     .execute(&state.db)

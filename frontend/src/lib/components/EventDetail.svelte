@@ -18,9 +18,7 @@
   let membersError = '';
   let rsvpError = '';
 
-  onMount(async () => {
-    await loadMembers();
-  });
+  onMount(async () => { await loadMembers(); });
 
   async function loadMembers() {
     membersLoading = true;
@@ -58,6 +56,10 @@
     }
   }
 
+  function handleBackdropKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') dispatch('close');
+  }
+
   $: isOwner = currentUserId != null && currentUserId === event.created_by;
 
   const RSVP_BTNS: { status: RsvpStatus; label: string; icon: any; active: string }[] = [
@@ -71,16 +73,18 @@
     late:      'bg-amber-500/15  text-amber-400  border-amber-500/30',
     not_going: 'bg-red-500/15    text-red-400    border-red-500/30',
   };
-  const STATUS_LABEL: Record<RsvpStatus, string> = {
-    going: 'Going', late: 'Late', not_going: 'Not going'
-  };
+  const STATUS_LABEL: Record<RsvpStatus, string> = { going: 'Going', late: 'Late', not_going: 'Not going' };
 </script>
 
+<!-- svelte-ignore a11y_interactive_supports_focus -->
 <div
   class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
   style="background:rgba(0,0,0,0.65); backdrop-filter:blur(4px);"
+  role="dialog"
+  aria-modal="true"
+  tabindex="-1"
   on:click|self={() => dispatch('close')}
-  role="dialog" aria-modal="true"
+  on:keydown={handleBackdropKey}
 >
   <div
     class="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden"
@@ -89,7 +93,6 @@
     <div class="h-0.5 w-full" style="background:{event.color ?? '#6366f1'};"></div>
 
     <div class="p-5 flex flex-col gap-4">
-      <!-- Header -->
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
@@ -104,23 +107,22 @@
         </div>
         <div class="flex items-center gap-0.5 shrink-0">
           {#if isOwner}
-            <button on:click={() => dispatch('edit')}
+            <button on:click={() => dispatch('edit')} aria-label="Edit event"
               class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
               <Pencil class="w-3.5 h-3.5" />
             </button>
-            <button on:click={() => dispatch('delete')}
+            <button on:click={() => dispatch('delete')} aria-label="Delete event"
               class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-500/10 transition text-muted-foreground hover:text-red-400">
               <Trash2 class="w-3.5 h-3.5" />
             </button>
           {/if}
-          <button on:click={() => dispatch('close')}
+          <button on:click={() => dispatch('close')} aria-label="Close"
             class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
             <X class="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <!-- Meta -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock class="w-3.5 h-3.5 shrink-0" />
@@ -138,7 +140,6 @@
         <p class="text-sm text-muted-foreground leading-relaxed">{event.description}</p>
       {/if}
 
-      <!-- RSVP section (public events only) -->
       {#if !event.private}
         <div class="border-t border-border pt-4 flex flex-col gap-2.5">
           <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Will you attend?</p>
@@ -147,6 +148,7 @@
               <button
                 on:click={() => rsvp(btn.status)}
                 disabled={rsvpLoading}
+                aria-pressed={myStatus === btn.status}
                 class="h-8 rounded-lg border text-xs font-medium transition-all active:scale-95
                        flex items-center justify-center gap-1
                        {myStatus === btn.status ? btn.active : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground'}
@@ -170,8 +172,9 @@
 
           {#if myStatus === 'late'}
             <div class="flex items-center gap-2">
-              <label class="text-xs text-muted-foreground shrink-0">Minutes late</label>
+              <label for="late-min" class="text-xs text-muted-foreground shrink-0">Minutes late</label>
               <input
+                id="late-min"
                 type="number" min="1" max="120"
                 bind:value={lateMinutes}
                 class="h-7 w-20 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring transition"
@@ -186,7 +189,6 @@
         </div>
       {/if}
 
-      <!-- Attendees -->
       <div class="border-t border-border pt-4 flex flex-col gap-2">
         <div class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <Users class="w-3.5 h-3.5" />
@@ -211,6 +213,7 @@
                   <div
                     class="w-5 h-5 rounded-full border border-border flex items-center justify-center text-[10px] font-bold uppercase"
                     style="background:hsl({((m.username ?? '?').charCodeAt(0)*47)%360},40%,25%); color:hsl({((m.username ?? '?').charCodeAt(0)*47)%360},70%,70%);"
+                    aria-hidden="true"
                   >
                     {(m.username ?? '?')[0]}
                   </div>

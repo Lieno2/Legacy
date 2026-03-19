@@ -75,6 +75,10 @@
     } finally { saving = false; }
   }
 
+  function handleBackdropKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') dispatch('cancel');
+  }
+
   const BASE_INPUT = [
     'w-full rounded-lg border bg-muted/20 px-3 text-sm outline-none transition',
     'focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20',
@@ -86,11 +90,15 @@
   }
 </script>
 
+<!-- svelte-ignore a11y_interactive_supports_focus -->
 <div
   class="fixed inset-0 z-50 flex items-center justify-center p-4"
   style="background:rgba(0,0,0,0.65); backdrop-filter:blur(4px);"
+  role="dialog"
+  aria-modal="true"
+  tabindex="-1"
   on:click|self={() => dispatch('cancel')}
-  role="dialog" aria-modal="true"
+  on:keydown={handleBackdropKey}
 >
   <div
     class="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden"
@@ -113,6 +121,7 @@
       <button
         on:click={() => dispatch('cancel')}
         class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground"
+        aria-label="Close"
       >
         <X class="w-4 h-4" />
       </button>
@@ -122,8 +131,9 @@
 
       <!-- Title -->
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
+        <label for="ev-title" class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
         <input
+          id="ev-title"
           bind:value={title}
           placeholder="e.g. Team meeting"
           class={inputCls('title')}
@@ -139,10 +149,11 @@
       <!-- Date + Time -->
       <div class="grid grid-cols-2 gap-3">
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+          <label for="ev-date" class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
             <Calendar class="w-3 h-3" /> Date
           </label>
           <input
+            id="ev-date"
             type="date"
             bind:value={dateVal}
             class={inputCls('date')}
@@ -155,20 +166,21 @@
           {/if}
         </div>
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+          <label for="ev-time" class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
             <Clock class="w-3 h-3" /> Time
           </label>
-          <input type="time" bind:value={timeVal} class="{BASE_INPUT} h-9 border-input" />
+          <input id="ev-time" type="time" bind:value={timeVal} class="{BASE_INPUT} h-9 border-input" />
         </div>
       </div>
 
       <!-- Description -->
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+        <label for="ev-desc" class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           <AlignLeft class="w-3 h-3" /> Description
           <span class="normal-case font-normal text-muted-foreground/50 ml-0.5">(optional)</span>
         </label>
         <textarea
+          id="ev-desc"
           bind:value={description}
           rows="3"
           placeholder="Add more details about this event..."
@@ -178,11 +190,12 @@
 
       <!-- Location -->
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+        <label for="ev-loc" class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           <MapPin class="w-3 h-3" /> Location
           <span class="normal-case font-normal text-muted-foreground/50 ml-0.5">(optional)</span>
         </label>
         <input
+          id="ev-loc"
           bind:value={location}
           placeholder="Office, Zoom link, address..."
           class="{BASE_INPUT} h-9 border-input"
@@ -192,14 +205,14 @@
       <!-- Color + Private -->
       <div class="flex items-end justify-between gap-4 pt-1 border-t border-border">
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Color</label>
-          <!-- padding gives room for the scale(1.25) selected swatch without clipping -->
+          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Color</span>
           <div class="flex items-center gap-2 py-1 px-0.5">
             {#each COLORS as c}
               <button
                 type="button"
                 on:click={() => (color = c.hex)}
                 title={c.name}
+                aria-label={c.name}
                 class="w-4 h-4 rounded-full transition-all duration-150 shrink-0
                        {color === c.hex
                          ? 'scale-125 ring-2 ring-offset-2 ring-offset-card'
@@ -210,12 +223,12 @@
           </div>
         </div>
 
-        <label class="flex items-center gap-2 cursor-pointer select-none shrink-0 pb-1">
+        <label for="ev-private" class="flex items-center gap-2 cursor-pointer select-none shrink-0 pb-1">
           <span class="text-sm text-muted-foreground flex items-center gap-1.5">
             <Lock class="w-3.5 h-3.5" /> Private
           </span>
           <div class="relative">
-            <input type="checkbox" bind:checked={isPrivate} class="sr-only peer" />
+            <input id="ev-private" type="checkbox" bind:checked={isPrivate} class="sr-only peer" />
             <div class="w-9 h-5 rounded-full border transition-colors duration-200
                         bg-muted border-border peer-checked:bg-primary peer-checked:border-primary"></div>
             <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm
@@ -224,7 +237,6 @@
         </label>
       </div>
 
-      <!-- Global error -->
       {#if fieldErrors.global}
         <div class="flex items-start gap-2.5 px-3 py-3 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl">
           <AlertCircle class="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
@@ -232,7 +244,6 @@
         </div>
       {/if}
 
-      <!-- Actions -->
       <div class="flex gap-2 pt-1">
         <button
           type="button"

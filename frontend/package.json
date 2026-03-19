@@ -1,7 +1,7 @@
 {
-  "name": "legacy-frontend",
-  "version": "0.1.0",
+  "name": "frontend",
   "private": true,
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -13,16 +13,17 @@
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.0.0",
     "@sveltejs/kit": "^2.0.0",
-    "@sveltejs/vite-plugin-svelte": "^3.0.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0-next.6",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
-    "tailwindcss": "^3.4.17",
     "typescript": "^5.0.0",
     "vite": "^5.0.0"
   },
   "dependencies": {
-    "lucide-svelte": "^0.468.0"
+    "lucide-svelte": "^0.468.0",
+    "tailwindcss": "^3.4.0"
+  },
+  "overrides": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0-next.6"
   }
 }
