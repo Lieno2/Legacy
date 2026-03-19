@@ -18,26 +18,27 @@ pub enum AppError {
     BadRequest(String),
     #[error("Conflict: {0}")]
     Conflict(String),
-    #[error("Internal server error")]
+    #[error("Internal server error: {0}")]
     Internal(#[from] anyhow::Error),
-    #[error("Database error")]
+    #[error("Database error: {0}")]
     Db(#[from] sqlx::Error),
-    #[error("Redis error")]
+    #[error("Redis error: {0}")]
     Redis(#[from] redis::RedisError),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = match &self {
-            AppError::Unauthorized    => (StatusCode::UNAUTHORIZED, self.to_string()),
-            AppError::Forbidden       => (StatusCode::FORBIDDEN, self.to_string()),
-            AppError::NotFound        => (StatusCode::NOT_FOUND, self.to_string()),
-            AppError::BadRequest(m)   => (StatusCode::BAD_REQUEST, m.clone()),
-            AppError::Conflict(m)     => (StatusCode::CONFLICT, m.clone()),
-            AppError::Internal(_)     => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string()),
-            AppError::Db(_)           => (StatusCode::INTERNAL_SERVER_ERROR, "Database error".to_string()),
-            AppError::Redis(_)        => (StatusCode::INTERNAL_SERVER_ERROR, "Cache error".to_string()),
+            AppError::Unauthorized  => (StatusCode::UNAUTHORIZED,            self.to_string()),
+            AppError::Forbidden     => (StatusCode::FORBIDDEN,               self.to_string()),
+            AppError::NotFound      => (StatusCode::NOT_FOUND,               self.to_string()),
+            AppError::BadRequest(m) => (StatusCode::BAD_REQUEST,             m.clone()),
+            AppError::Conflict(m)   => (StatusCode::CONFLICT,                m.clone()),
+            AppError::Internal(e)   => (StatusCode::INTERNAL_SERVER_ERROR,   format!("Internal: {e:#}")),
+            AppError::Db(e)         => (StatusCode::INTERNAL_SERVER_ERROR,   format!("Database error: {e}")),
+            AppError::Redis(e)      => (StatusCode::INTERNAL_SERVER_ERROR,   format!("Cache error: {e}")),
         };
+        eprintln!("[ERROR] {status}: {message}");
         (status, Json(json!({ "error": message }))).into_response()
     }
 }

@@ -41,7 +41,8 @@ pub async fn list(
     let members = sqlx::query_as::<_, EventMember>(
         r#"
         SELECT em."eventId" AS event_id, em."userId" AS user_id,
-               u.username, em.status, em."lateMinutes" AS late_minutes, em."joinedAt" AS joined_at
+               u.username, em.status, em."lateMinutes" AS late_minutes,
+               em."joinedAt" AS joined_at
         FROM "EventMembers" em
         LEFT JOIN "Users" u ON em."userId" = u.id
         WHERE em."eventId" = $1
@@ -76,38 +77,32 @@ pub async fn upsert(
         return Err(AppError::BadRequest("Invalid status".into()));
     }
 
-    let exists = sqlx::query(r#"SELECT id FROM "Events" WHERE id = $1"#)
-        .bind(body.event_id)
-        .fetch_optional(&state.db)
-        .await?
-        .is_some();
+    let exists = sqlx::query_scalar::<_, bool>(
+        r#"SELECT EXISTS(SELECT 1 FROM "Events" WHERE id = $1)"#
+    )
+    .bind(body.event_id)
+    .fetch_one(&state.db)
+    .await?;
+
     if !exists {
         return Err(AppError::NotFound);
     }
 
     let late_minutes = if body.status == "late" { body.late_minutes } else { None };
 
-    // Resolve the username for the denormalized column
-    let username: Option<String> = sqlx::query_scalar(
-        r#"SELECT username FROM "Users" WHERE id = $1"#
-    )
-    .bind(&auth.0.sub)
-    .fetch_optional(&state.db)
-    .await?;
-
+    // Only insert the columns that are defined without defaults other than joinedAt.
+    // username is a denormalized column — skip it here and rely on the JOIN in list().
     sqlx::query(
         r#"
-        INSERT INTO "EventMembers" ("eventId", "userId", username, status, "lateMinutes")
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO "EventMembers" ("eventId", "userId", status, "lateMinutes")
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT ("eventId", "userId") DO UPDATE
-            SET username      = EXCLUDED.username,
-                status        = EXCLUDED.status,
+            SET status        = EXCLUDED.status,
                 "lateMinutes" = EXCLUDED."lateMinutes"
         "#
     )
     .bind(body.event_id)
     .bind(&auth.0.sub)
-    .bind(&username)
     .bind(&body.status)
     .bind(late_minutes)
     .execute(&state.db)
