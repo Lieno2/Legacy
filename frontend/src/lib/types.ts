@@ -29,3 +29,20 @@ export interface EventMember {
 }
 
 export type RsvpStatus = 'going' | 'late' | 'not_going';
+
+// ── Polls ────────────────────────────────────────────────────────────────────
+
+export interface PollChoice {
+  id: number;
+  label: string;
+  position: number;
+  answer_count: number;
+}
+
+export interface Poll {
+  id: number;
+  event_id: number;
+  question: string;
+  choices: PollChoice[];
+  my_choice_id: number | null;
+}

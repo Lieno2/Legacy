@@ -15,7 +15,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
 
-use routes::{auth as auth_routes, events, rsvp, account, admin, invites};
+use routes::{auth as auth_routes, events, rsvp, account, admin, invites, polls};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -53,6 +53,10 @@ use routes::{auth as auth_routes, events, rsvp, account, admin, invites};
         invites::list,
         invites::invite,
         invites::remove,
+        polls::get_poll,
+        polls::upsert_poll,
+        polls::delete_poll,
+        polls::answer_poll,
     ),
     components(
         schemas(
@@ -82,6 +86,10 @@ use routes::{auth as auth_routes, events, rsvp, account, admin, invites};
             invites::InviteUser,
             invites::InviteRequest,
             invites::RemoveInviteRequest,
+            polls::PollChoice,
+            polls::PollResponse,
+            polls::CreatePollRequest,
+            polls::AnswerPollRequest,
         )
     ),
     tags(
@@ -91,6 +99,7 @@ use routes::{auth as auth_routes, events, rsvp, account, admin, invites};
         (name = "Account", description = "User account"),
         (name = "Admin",   description = "Admin only endpoints"),
         (name = "Invites", description = "Private event invite management"),
+        (name = "Polls",   description = "Event polls"),
     ),
     security(
         ("bearer_auth" = [])

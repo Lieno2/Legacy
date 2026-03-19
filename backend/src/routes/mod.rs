@@ -4,6 +4,7 @@ pub mod rsvp;
 pub mod account;
 pub mod admin;
 pub mod invites;
+pub mod polls;
 
 use axum::{Router, routing::{get, post, put, delete}};
 use sqlx::PgPool;
@@ -33,4 +34,6 @@ pub fn all_routes() -> Router<AppState> {
         .route("/admin/stats",        get(admin::get_stats))
         .route("/admin/audit",        get(admin::list_audit))
         .route("/admin/audit/revert", post(admin::revert_audit))
+        .route("/polls",              get(polls::get_poll).post(polls::upsert_poll).delete(polls::delete_poll))
+        .route("/polls/answer",       post(polls::answer_poll))
 }
