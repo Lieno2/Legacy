@@ -18,18 +18,28 @@ export const events = pgTable("Events", {
     description: text("description"),
     date: timestamp("date").notNull(),
     location: text("location"),
+    color: text("color"),
     createdBy: text("createdBy").notNull().references(() => users.id),
     createdAt: timestamp("createdAt").defaultNow(),
     private: boolean("private").notNull().default(false),
 })
 
 export const eventMembers = pgTable("EventMembers", {
-    eventId: bigint("eventId", { mode: "number" }).notNull().references(() => events.id),
-    userId: text("userId").notNull().references(() => users.id),
+    eventId: bigint("eventId", { mode: "number" }).notNull().references(() => events.id, { onDelete: "cascade" }),
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("going"),  // "going" | "late" | "not_going"
+    lateMinutes: integer("lateMinutes"),
     joinedAt: timestamp("joinedAt").defaultNow(),
 }, (t) => ({
     pk: primaryKey({ columns: [t.eventId, t.userId] }),
 }))
+
+// Key-value store for app settings (Discord webhook URL, etc.)
+export const settings = pgTable("Settings", {
+    key: text("key").primaryKey(),
+    value: text("value").notNull().default(""),
+    updatedAt: timestamp("updatedAt").defaultNow(),
+})
 
 // ── Auth.js tables ────────────────────────────────────────────────────────────
 

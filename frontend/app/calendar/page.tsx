@@ -1,6 +1,8 @@
-// app/page.tsx
-import Calendar from "@/components/ui/calendar"
+import { auth } from "@/auth"
+import Calendar from "@/components/calendar"
 
-export default function Page() {
-    return <Calendar/>
+export default async function Page() {
+    const session = await auth()
+    const userId = session?.user?.id ?? null
+    return <Calendar currentUserId={userId} />
 }
