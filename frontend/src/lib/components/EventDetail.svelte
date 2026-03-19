@@ -3,7 +3,7 @@
   import { apiFetch } from '$lib/api';
   import { formatDate, formatTime } from '$lib/utils';
   import type { Event, EventMember, RsvpStatus } from '$lib/types';
-  import { X, MapPin, Clock, Lock, Pencil, Trash2, Users, Check, Timer, XCircle, AlertCircle, Loader2 } from 'lucide-svelte';
+  import { X, MapPin, Clock, Lock, Pencil, Trash2, Users, Check, Timer, XCircle, AlertCircle, Loader2, Minus, Plus } from 'lucide-svelte';
 
   export let event: Event;
   export let currentUserId: string | null;
@@ -12,7 +12,7 @@
 
   let members: EventMember[] = [];
   let myStatus: RsvpStatus | null = null;
-  let lateMinutes = 0;
+  let lateMinutes = 5;
   let rsvpLoading = false;
   let membersLoading = true;
   let membersError = '';
@@ -27,7 +27,7 @@
       members = await apiFetch<EventMember[]>(`/api/rsvp?event_id=${event.id}`);
       const me = members.find(m => m.user_id === currentUserId);
       myStatus    = (me?.status as RsvpStatus) ?? null;
-      lateMinutes = me?.late_minutes ?? 0;
+      lateMinutes = me?.late_minutes ?? 5;
     } catch (err: unknown) {
       membersError = err instanceof Error ? err.message : 'Failed to load attendees';
     } finally {
@@ -58,6 +58,10 @@
 
   function handleBackdropKey(e: KeyboardEvent) {
     if (e.key === 'Escape') dispatch('close');
+  }
+
+  function clampMinutes(v: number) {
+    lateMinutes = Math.min(120, Math.max(1, v));
   }
 
   $: isOwner = currentUserId != null && currentUserId === event.created_by;
@@ -93,6 +97,7 @@
     <div class="h-0.5 w-full" style="background:{event.color ?? '#6366f1'};"></div>
 
     <div class="p-5 flex flex-col gap-4">
+      <!-- Header -->
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
@@ -123,6 +128,7 @@
         </div>
       </div>
 
+      <!-- Meta -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock class="w-3.5 h-3.5 shrink-0" />
@@ -140,6 +146,7 @@
         <p class="text-sm text-muted-foreground leading-relaxed">{event.description}</p>
       {/if}
 
+      <!-- RSVP -->
       {#if !event.private}
         <div class="border-t border-border pt-4 flex flex-col gap-2.5">
           <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Will you attend?</p>
@@ -170,25 +177,53 @@
             </div>
           {/if}
 
+          <!-- Late minutes stepper -->
           {#if myStatus === 'late'}
-            <div class="flex items-center gap-2">
-              <label for="late-min" class="text-xs text-muted-foreground shrink-0">Minutes late</label>
-              <input
-                id="late-min"
-                type="number" min="1" max="120"
-                bind:value={lateMinutes}
-                class="h-7 w-20 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring transition"
-              />
+            <div class="flex items-center gap-2 bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2.5">
+              <Timer class="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span class="text-xs text-muted-foreground flex-1">Minutes late</span>
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  on:click={() => clampMinutes(lateMinutes - 5)}
+                  class="w-6 h-6 rounded-md flex items-center justify-center
+                         bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground
+                         transition active:scale-90 disabled:opacity-40"
+                  disabled={lateMinutes <= 1}
+                  aria-label="Decrease"
+                >
+                  <Minus class="w-3 h-3" />
+                </button>
+                <span class="w-8 text-center text-sm font-semibold tabular-nums text-amber-400">
+                  {lateMinutes}
+                </span>
+                <button
+                  type="button"
+                  on:click={() => clampMinutes(lateMinutes + 5)}
+                  class="w-6 h-6 rounded-md flex items-center justify-center
+                         bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground
+                         transition active:scale-90 disabled:opacity-40"
+                  disabled={lateMinutes >= 120}
+                  aria-label="Increase"
+                >
+                  <Plus class="w-3 h-3" />
+                </button>
+              </div>
               <button
                 on:click={() => rsvp('late')}
                 disabled={rsvpLoading}
-                class="text-xs text-primary hover:underline disabled:opacity-40"
-              >Update</button>
+                class="h-6 px-2.5 rounded-md bg-amber-500/15 border border-amber-500/25
+                       text-xs font-medium text-amber-400 hover:bg-amber-500/25
+                       transition active:scale-95 disabled:opacity-40 shrink-0"
+              >
+                {rsvpLoading ? '...' : 'Save'}
+              </button>
             </div>
           {/if}
         </div>
       {/if}
 
+      <!-- Attendees -->
       <div class="border-t border-border pt-4 flex flex-col gap-2">
         <div class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <Users class="w-3.5 h-3.5" />
