@@ -1,0 +1,199 @@
+use axum::{extract::{Query, State}, Json};
+use serde::Deserialize;
+
+use crate::{
+    auth::AdminUser,
+    error::{AppError, Result},
+    models::{EventWithCreator, UserPublic},
+    routes::AppState,
+};
+
+#[derive(Deserialize)]
+pub struct IdQuery {
+    pub id: String,
+}
+
+#[derive(Deserialize)]
+pub struct EventIdQuery {
+    pub id: i64,
+}
+
+#[derive(Deserialize)]
+pub struct CreateUserRequest {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+    pub perms: Option<i16>,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateUserRequest {
+    pub id: String,
+    pub username: String,
+    pub email: String,
+    pub perms: Option<i16>,
+    pub new_password: Option<String>,
+}
+
+// GET /api/admin/users
+pub async fn list_users(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<UserPublic>>> {
+    let users = sqlx::query_as!(
+        UserPublic,
+        r#"SELECT id, username, email, perms, "createdAt" AS created_at FROM "Users" ORDER BY "createdAt" ASC"#
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(users))
+}
+
+// POST /api/admin/users
+pub async fn create_user(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Json(body): Json<CreateUserRequest>,
+) -> Result<Json<UserPublic>> {
+    let username = body.username.trim().to_string();
+    let email = body.email.trim().to_string();
+
+    if username.is_empty() || email.is_empty() || body.password.is_empty() {
+        return Err(AppError::BadRequest("Username, email and password are required".into()));
+    }
+    if body.password.len() < 8 {
+        return Err(AppError::BadRequest("Password must be at least 8 characters".into()));
+    }
+
+    let exists = sqlx::query!(r#"SELECT id FROM "Users" WHERE email = $1"#, email)
+        .fetch_optional(&state.db)
+        .await?
+        .is_some();
+    if exists { return Err(AppError::Conflict("Email already in use".into())); }
+
+    let hash = bcrypt::hash(&body.password, bcrypt::DEFAULT_COST)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
+    let new_id = uuid::Uuid::new_v4().to_string();
+    let perms = body.perms.unwrap_or(0);
+
+    let user = sqlx::query_as!(
+        UserPublic,
+        r#"INSERT INTO "Users" (id, username, email, "passwordHash", perms)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id, username, email, perms, "createdAt" AS created_at"#,
+        new_id, username, email, hash, perms
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(user))
+}
+
+// PUT /api/admin/users
+pub async fn update_user(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Json(body): Json<UpdateUserRequest>,
+) -> Result<Json<UserPublic>> {
+    let username = body.username.trim().to_string();
+    let email = body.email.trim().to_string();
+    let perms = body.perms.unwrap_or(0);
+
+    if username.is_empty() || email.is_empty() {
+        return Err(AppError::BadRequest("Username and email are required".into()));
+    }
+
+    let updated = if let Some(new_pw) = &body.new_password {
+        if new_pw.len() < 8 {
+            return Err(AppError::BadRequest("Password must be at least 8 characters".into()));
+        }
+        let hash = bcrypt::hash(new_pw, bcrypt::DEFAULT_COST)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
+        sqlx::query_as!(
+            UserPublic,
+            r#"UPDATE "Users" SET username = $1, email = $2, perms = $3, "passwordHash" = $4
+               WHERE id = $5
+               RETURNING id, username, email, perms, "createdAt" AS created_at"#,
+            username, email, perms, hash, body.id
+        )
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?
+    } else {
+        sqlx::query_as!(
+            UserPublic,
+            r#"UPDATE "Users" SET username = $1, email = $2, perms = $3
+               WHERE id = $4
+               RETURNING id, username, email, perms, "createdAt" AS created_at"#,
+            username, email, perms, body.id
+        )
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?
+    };
+
+    Ok(Json(updated))
+}
+
+// DELETE /api/admin/users?id=X
+pub async fn delete_user(
+    admin: AdminUser,
+    State(state): State<AppState>,
+    Query(q): Query<IdQuery>,
+) -> Result<Json<serde_json::Value>> {
+    if q.id == admin.0.sub {
+        return Err(AppError::BadRequest("Cannot delete your own account".into()));
+    }
+
+    let deleted = sqlx::query!(
+        r#"DELETE FROM "Users" WHERE id = $1 RETURNING id"#,
+        q.id
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .is_some();
+
+    if !deleted { return Err(AppError::NotFound); }
+    Ok(Json(serde_json::json!({ "success": true })))
+}
+
+// GET /api/admin/events
+pub async fn list_events(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<EventWithCreator>>> {
+    let events = sqlx::query_as!(
+        EventWithCreator,
+        r#"
+        SELECT e.id, e.title, e.description, e.date, e.location, e.color,
+               e."createdBy" AS created_by, e."createdAt" AS created_at,
+               e.private, u.username AS creator_name
+        FROM "Events" e
+        LEFT JOIN "Users" u ON e."createdBy" = u.id
+        ORDER BY e.date ASC
+        "#
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(events))
+}
+
+// DELETE /api/admin/events?id=X
+pub async fn delete_event(
+    _admin: AdminUser,
+    State(state): State<AppState>,
+    Query(q): Query<EventIdQuery>,
+) -> Result<Json<serde_json::Value>> {
+    let deleted = sqlx::query!(
+        r#"DELETE FROM "Events" WHERE id = $1 RETURNING id"#,
+        q.id
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .is_some();
+
+    if !deleted { return Err(AppError::NotFound); }
+    Ok(Json(serde_json::json!({ "success": true })))
+}
