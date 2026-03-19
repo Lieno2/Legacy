@@ -65,14 +65,14 @@ pub async fn get_poll(
     Query(q): Query<EventIdQuery>,
 ) -> Result<Json<Option<PollResponse>>> {
     // Fetch the poll row
-    let poll_row = sqlx::query!(
-        r#"SELECT id, "eventId" AS event_id, question FROM "EventPolls" WHERE "eventId" = $1"#,
-        q.event_id
+    let poll_row = sqlx::query_as::<_, (i64, i64, String)>(
+        r#"SELECT id, "eventId", question FROM "EventPolls" WHERE "eventId" = $1"#,
     )
+    .bind(q.event_id)
     .fetch_optional(&state.db)
     .await?;
 
-    let Some(poll) = poll_row else {
+    let Some((poll_id, event_id, question)) = poll_row else {
         return Ok(Json(None));
     };
 
@@ -87,7 +87,7 @@ pub async fn get_poll(
            GROUP BY c.id, c.label, c.position
            ORDER BY c.position ASC"#,
     )
-    .bind(poll.id)
+    .bind(poll_id)
     .fetch_all(&state.db)
     .await?;
 
@@ -95,15 +95,15 @@ pub async fn get_poll(
     let my_choice_id = sqlx::query_scalar::<_, i64>(
         r#"SELECT "choiceId" FROM "EventPollAnswers" WHERE "pollId" = $1 AND "userId" = $2"#,
     )
-    .bind(poll.id)
+    .bind(poll_id)
     .bind(&user.0.sub)
     .fetch_optional(&state.db)
     .await?;
 
     Ok(Json(Some(PollResponse {
-        id: poll.id,
-        event_id: poll.event_id,
-        question: poll.question,
+        id: poll_id,
+        event_id,
+        question,
         choices,
         my_choice_id,
     })))
@@ -154,7 +154,8 @@ pub async fn upsert_poll(
     }
 
     // Delete existing poll (cascade removes choices + answers)
-    sqlx::query!(r#"DELETE FROM "EventPolls" WHERE "eventId" = $1"#, body.event_id)
+    sqlx::query(r#"DELETE FROM "EventPolls" WHERE "eventId" = $1"#)
+        .bind(body.event_id)
         .execute(&state.db)
         .await?;
 
@@ -224,7 +225,8 @@ pub async fn delete_poll(
         return Err(AppError::Forbidden);
     }
 
-    sqlx::query!(r#"DELETE FROM "EventPolls" WHERE "eventId" = $1"#, q.event_id)
+    sqlx::query(r#"DELETE FROM "EventPolls" WHERE "eventId" = $1"#)
+        .bind(q.event_id)
         .execute(&state.db)
         .await?;
 
