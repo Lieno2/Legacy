@@ -1,5 +1,6 @@
 use axum::{extract::State, Json};
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::{
     auth::AuthUser,
@@ -8,7 +9,7 @@ use crate::{
     routes::AppState,
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct UpdateProfileRequest {
     pub username: String,
     pub email: String,
@@ -21,6 +22,17 @@ struct PasswordRow {
     password_hash: String,
 }
 
+/// Get current user profile
+#[utoipa::path(
+    get,
+    path = "/api/account",
+    tag = "Account",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "User profile", body = UserPublic),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
 pub async fn get_profile(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -36,6 +48,19 @@ pub async fn get_profile(
     Ok(Json(user))
 }
 
+/// Update current user profile
+#[utoipa::path(
+    put,
+    path = "/api/account",
+    tag = "Account",
+    security(("bearer_auth" = [])),
+    request_body = UpdateProfileRequest,
+    responses(
+        (status = 200, description = "Updated profile", body = UserPublic),
+        (status = 400, description = "Validation error"),
+        (status = 409, description = "Username or email taken"),
+    )
+)]
 pub async fn update_profile(
     auth: AuthUser,
     State(state): State<AppState>,

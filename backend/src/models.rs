@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use utoipa::ToSchema;
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ pub struct User {
     pub created_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, ToSchema)]
 pub struct UserPublic {
     pub id: String,
     pub username: String,
@@ -26,20 +26,7 @@ pub struct UserPublic {
 
 // ── Events ───────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Event {
-    pub id: i64,
-    pub title: String,
-    pub description: Option<String>,
-    pub date: DateTime<Utc>,
-    pub location: Option<String>,
-    pub color: Option<String>,
-    pub created_by: String,
-    pub created_at: Option<DateTime<Utc>>,
-    pub private: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, ToSchema)]
 pub struct EventWithCreator {
     pub id: i64,
     pub title: String,
@@ -53,9 +40,9 @@ pub struct EventWithCreator {
     pub creator_name: Option<String>,
 }
 
-// ── Event Members ─────────────────────────────────────────────────────────────
+// ── Event Members ─────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, ToSchema)]
 pub struct EventMember {
     pub event_id: i64,
     pub user_id: String,
@@ -69,7 +56,7 @@ pub struct EventMember {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    pub sub: String,   // user id
+    pub sub: String,
     pub email: String,
     pub perms: i16,
     pub exp: usize,

@@ -2,6 +2,7 @@ use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
 use chrono::{DateTime, Utc};
+use utoipa::ToSchema;
 
 use crate::{
     auth::AuthUser,
@@ -10,7 +11,7 @@ use crate::{
     routes::AppState,
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateEventRequest {
     pub title: String,
     pub description: Option<String>,
@@ -20,7 +21,7 @@ pub struct CreateEventRequest {
     pub private: Option<bool>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct UpdateEventRequest {
     pub title: String,
     pub description: Option<String>,
@@ -30,6 +31,17 @@ pub struct UpdateEventRequest {
     pub private: Option<bool>,
 }
 
+/// List events for the current user
+#[utoipa::path(
+    get,
+    path = "/api/events",
+    tag = "Events",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of events", body = Vec<EventWithCreator>),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
 pub async fn list(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -63,6 +75,19 @@ pub async fn list(
     Ok(Json(events))
 }
 
+/// Create a new event
+#[utoipa::path(
+    post,
+    path = "/api/events",
+    tag = "Events",
+    security(("bearer_auth" = [])),
+    request_body = CreateEventRequest,
+    responses(
+        (status = 200, description = "Created event", body = EventWithCreator),
+        (status = 400, description = "Bad request"),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
 pub async fn create(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -99,6 +124,19 @@ pub async fn create(
     Ok(Json(event))
 }
 
+/// Update an existing event
+#[utoipa::path(
+    put,
+    path = "/api/events/{id}",
+    tag = "Events",
+    security(("bearer_auth" = [])),
+    params(("id" = i64, Path, description = "Event ID")),
+    request_body = UpdateEventRequest,
+    responses(
+        (status = 200, description = "Updated event", body = EventWithCreator),
+        (status = 404, description = "Event not found"),
+    )
+)]
 pub async fn update(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -139,6 +177,18 @@ pub async fn update(
     Ok(Json(event))
 }
 
+/// Delete an event
+#[utoipa::path(
+    delete,
+    path = "/api/events/{id}",
+    tag = "Events",
+    security(("bearer_auth" = [])),
+    params(("id" = i64, Path, description = "Event ID")),
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 404, description = "Event not found"),
+    )
+)]
 pub async fn delete(
     auth: AuthUser,
     State(state): State<AppState>,

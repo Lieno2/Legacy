@@ -1,5 +1,6 @@
 use axum::{extract::{Query, State}, Json};
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::{
     auth::AuthUser,
@@ -8,18 +9,30 @@ use crate::{
     routes::AppState,
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct EventIdQuery {
     pub event_id: i64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct RsvpRequest {
     pub event_id: i64,
     pub status: String,
     pub late_minutes: Option<i32>,
 }
 
+/// List RSVPs for an event
+#[utoipa::path(
+    get,
+    path = "/api/rsvp",
+    tag = "RSVP",
+    security(("bearer_auth" = [])),
+    params(("event_id" = i64, Query, description = "Event ID")),
+    responses(
+        (status = 200, description = "List of RSVPs", body = Vec<EventMember>),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
 pub async fn list(
     _auth: AuthUser,
     State(state): State<AppState>,
@@ -41,6 +54,19 @@ pub async fn list(
     Ok(Json(members))
 }
 
+/// Upsert RSVP for an event
+#[utoipa::path(
+    post,
+    path = "/api/rsvp",
+    tag = "RSVP",
+    security(("bearer_auth" = [])),
+    request_body = RsvpRequest,
+    responses(
+        (status = 200, description = "RSVP saved"),
+        (status = 400, description = "Invalid status"),
+        (status = 404, description = "Event not found"),
+    )
+)]
 pub async fn upsert(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -79,6 +105,17 @@ pub async fn upsert(
     Ok(Json(serde_json::json!({ "success": true })))
 }
 
+/// Remove RSVP for an event
+#[utoipa::path(
+    delete,
+    path = "/api/rsvp",
+    tag = "RSVP",
+    security(("bearer_auth" = [])),
+    params(("event_id" = i64, Query, description = "Event ID")),
+    responses(
+        (status = 200, description = "RSVP removed"),
+    )
+)]
 pub async fn remove(
     auth: AuthUser,
     State(state): State<AppState>,

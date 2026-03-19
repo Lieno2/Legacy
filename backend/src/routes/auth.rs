@@ -1,5 +1,6 @@
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
     auth::{generate_access_token, generate_refresh_token, store_refresh_token, validate_refresh_token, revoke_refresh_token, AuthUser},
@@ -8,29 +9,40 @@ use crate::{
     routes::AppState,
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct AuthResponse {
     pub access_token: String,
     pub refresh_token: String,
     pub user: UserPublic,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct RefreshRequest {
     pub refresh_token: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct LogoutRequest {
     pub refresh_token: String,
 }
 
+/// Login with email and password
+#[utoipa::path(
+    post,
+    path = "/api/auth/login",
+    tag = "Auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 401, description = "Invalid credentials"),
+    )
+)]
 pub async fn login(
     State(state): State<AppState>,
     Json(body): Json<LoginRequest>,
@@ -66,6 +78,16 @@ pub async fn login(
     }))
 }
 
+/// Logout and revoke refresh token
+#[utoipa::path(
+    post,
+    path = "/api/auth/logout",
+    tag = "Auth",
+    request_body = LogoutRequest,
+    responses(
+        (status = 200, description = "Logged out"),
+    )
+)]
 pub async fn logout(
     State(state): State<AppState>,
     Json(body): Json<LogoutRequest>,
@@ -74,6 +96,17 @@ pub async fn logout(
     Ok(Json(serde_json::json!({ "success": true })))
 }
 
+/// Refresh access token
+#[utoipa::path(
+    post,
+    path = "/api/auth/refresh",
+    tag = "Auth",
+    request_body = RefreshRequest,
+    responses(
+        (status = 200, description = "New access token issued"),
+        (status = 401, description = "Invalid or expired refresh token"),
+    )
+)]
 pub async fn refresh(
     State(state): State<AppState>,
     Json(body): Json<RefreshRequest>,
@@ -92,6 +125,19 @@ pub async fn refresh(
     Ok(Json(serde_json::json!({ "access_token": access_token })))
 }
 
+/// Get current authenticated user
+#[utoipa::path(
+    get,
+    path = "/api/auth/me",
+    tag = "Auth",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "Current user", body = UserPublic),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
 pub async fn me(
     auth: AuthUser,
     State(state): State<AppState>,

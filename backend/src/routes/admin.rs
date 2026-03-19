@@ -1,5 +1,6 @@
 use axum::{extract::{Query, State}, Json};
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::{
     auth::AdminUser,
@@ -8,17 +9,17 @@ use crate::{
     routes::AppState,
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct IdQuery {
     pub id: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct EventIdQuery {
     pub id: i64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateUserRequest {
     pub username: String,
     pub email: String,
@@ -26,7 +27,7 @@ pub struct CreateUserRequest {
     pub perms: Option<i16>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct UpdateUserRequest {
     pub id: String,
     pub username: String,
@@ -35,6 +36,17 @@ pub struct UpdateUserRequest {
     pub new_password: Option<String>,
 }
 
+/// List all users (admin)
+#[utoipa::path(
+    get,
+    path = "/api/admin/users",
+    tag = "Admin",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "All users", body = Vec<UserPublic>),
+        (status = 403, description = "Forbidden"),
+    )
+)]
 pub async fn list_users(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -48,6 +60,18 @@ pub async fn list_users(
     Ok(Json(users))
 }
 
+/// Create a new user (admin)
+#[utoipa::path(
+    post,
+    path = "/api/admin/users",
+    tag = "Admin",
+    security(("bearer_auth" = [])),
+    request_body = CreateUserRequest,
+    responses(
+        (status = 200, description = "Created user", body = UserPublic),
+        (status = 409, description = "Email already in use"),
+    )
+)]
 pub async fn create_user(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -91,6 +115,18 @@ pub async fn create_user(
     Ok(Json(user))
 }
 
+/// Update a user (admin)
+#[utoipa::path(
+    put,
+    path = "/api/admin/users",
+    tag = "Admin",
+    security(("bearer_auth" = [])),
+    request_body = UpdateUserRequest,
+    responses(
+        (status = 200, description = "Updated user", body = UserPublic),
+        (status = 404, description = "User not found"),
+    )
+)]
 pub async fn update_user(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -141,6 +177,18 @@ pub async fn update_user(
     Ok(Json(updated))
 }
 
+/// Delete a user (admin)
+#[utoipa::path(
+    delete,
+    path = "/api/admin/users",
+    tag = "Admin",
+    security(("bearer_auth" = [])),
+    params(("id" = String, Query, description = "User ID")),
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 404, description = "User not found"),
+    )
+)]
 pub async fn delete_user(
     admin: AdminUser,
     State(state): State<AppState>,
@@ -162,6 +210,17 @@ pub async fn delete_user(
     Ok(Json(serde_json::json!({ "success": true })))
 }
 
+/// List all events (admin)
+#[utoipa::path(
+    get,
+    path = "/api/admin/events",
+    tag = "Admin",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "All events", body = Vec<EventWithCreator>),
+        (status = 403, description = "Forbidden"),
+    )
+)]
 pub async fn list_events(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -182,6 +241,18 @@ pub async fn list_events(
     Ok(Json(events))
 }
 
+/// Delete an event (admin)
+#[utoipa::path(
+    delete,
+    path = "/api/admin/events",
+    tag = "Admin",
+    security(("bearer_auth" = [])),
+    params(("id" = i64, Query, description = "Event ID")),
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 404, description = "Event not found"),
+    )
+)]
 pub async fn delete_event(
     _admin: AdminUser,
     State(state): State<AppState>,

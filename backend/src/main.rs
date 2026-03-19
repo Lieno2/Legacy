@@ -11,6 +11,89 @@ use axum::{
 };
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use utoipa::OpenApi;
+use utoipa_scalar::{Scalar, Servable};
+
+use routes::{auth as auth_routes, events, rsvp, account, admin};
+
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "Legacy API",
+        version = "1.0.0",
+        description = "Backend API for Legacy calendar app"
+    ),
+    paths(
+        auth_routes::login,
+        auth_routes::logout,
+        auth_routes::refresh,
+        auth_routes::me,
+        events::list,
+        events::create,
+        events::update,
+        events::delete,
+        rsvp::list,
+        rsvp::upsert,
+        rsvp::remove,
+        account::get_profile,
+        account::update_profile,
+        admin::list_users,
+        admin::create_user,
+        admin::update_user,
+        admin::delete_user,
+        admin::list_events,
+        admin::delete_event,
+    ),
+    components(
+        schemas(
+            models::UserPublic,
+            models::EventWithCreator,
+            models::EventMember,
+            auth_routes::LoginRequest,
+            auth_routes::AuthResponse,
+            auth_routes::RefreshRequest,
+            auth_routes::LogoutRequest,
+            events::CreateEventRequest,
+            events::UpdateEventRequest,
+            rsvp::RsvpRequest,
+            rsvp::EventIdQuery,
+            account::UpdateProfileRequest,
+            admin::CreateUserRequest,
+            admin::UpdateUserRequest,
+            admin::IdQuery,
+            admin::EventIdQuery,
+        )
+    ),
+    tags(
+        (name = "Auth", description = "Authentication endpoints"),
+        (name = "Events", description = "Event management"),
+        (name = "RSVP", description = "RSVP management"),
+        (name = "Account", description = "User account"),
+        (name = "Admin", description = "Admin only endpoints"),
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    modifiers(&SecurityAddon)
+)]
+struct ApiDoc;
+
+struct SecurityAddon;
+
+impl utoipa::Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "bearer_auth",
+                utoipa::openapi::security::SecurityScheme::Http(
+                    utoipa::openapi::security::Http::new(
+                        utoipa::openapi::security::HttpAuthScheme::Bearer,
+                    )
+                ),
+            );
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -34,6 +117,7 @@ async fn main() {
         .allow_credentials(true);
 
     let app = Router::new()
+        .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
         .nest("/api", routes::all_routes())
         .layer(cors)
         .with_state(routes::AppState {
@@ -44,5 +128,6 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
     tracing::info!("Backend listening on http://0.0.0.0:3001");
+    tracing::info!("Scalar docs at http://0.0.0.0:3001/scalar");
     axum::serve(listener, app).await.unwrap();
 }
