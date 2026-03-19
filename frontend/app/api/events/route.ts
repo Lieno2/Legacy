@@ -7,7 +7,9 @@ import { eq, and } from "drizzle-orm"
 // GET all events for the current user
 export async function GET() {
     const session = await auth()
+    console.log("GET /api/events - Session:", JSON.stringify(session, null, 2))
     if (!session?.user?.id) {
+        console.log("No user ID in session")
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -27,7 +29,9 @@ export async function GET() {
 // POST create a new event
 export async function POST(req: NextRequest) {
     const session = await auth()
+    console.log("POST /api/events - Session:", JSON.stringify(session, null, 2))
     if (!session?.user?.id) {
+        console.log("No user ID in session")
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
