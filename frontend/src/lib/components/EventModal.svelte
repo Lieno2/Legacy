@@ -5,12 +5,13 @@
   import { X } from 'lucide-svelte';
 
   export let event: Event | null = null;
+  export let defaultDate: string = '';
 
   const dispatch = createEventDispatcher();
 
   let title       = event?.title ?? '';
   let description = event?.description ?? '';
-  let date        = event ? event.date.slice(0, 16) : '';
+  let date        = event ? event.date.slice(0, 16) : defaultDate;
   let location    = event?.location ?? '';
   let color       = event?.color ?? '#6366f1';
   let isPrivate   = event?.private ?? false;

@@ -7,7 +7,7 @@
   import EventModal from '$lib/components/EventModal.svelte';
   import EventDetail from '$lib/components/EventDetail.svelte';
   import { goto } from '$app/navigation';
-  import { Calendar, Plus, User, ChevronLeft, ChevronRight } from 'lucide-svelte';
+  import { Calendar, User, ChevronLeft, ChevronRight, Plus } from 'lucide-svelte';
 
   let events: Event[] = [];
   let loading = true;
@@ -15,8 +15,8 @@
   let viewYear  = today.getFullYear();
   let viewMonth = today.getMonth();
 
-  // Modal state
-  let showCreate   = false;
+  let showCreate    = false;
+  let createDate    = '';
   let editingEvent: Event | null = null;
   let detailEvent:  Event | null = null;
 
@@ -33,7 +33,6 @@
     finally { loading = false; }
   }
 
-  // Calendar grid
   $: daysInMonth  = getDaysInMonth(viewYear, viewMonth);
   $: firstDay     = getFirstDayOfMonth(viewYear, viewMonth);
   $: calendarDays = buildCalendar(viewYear, viewMonth, firstDay, daysInMonth);
@@ -48,6 +47,22 @@
   function eventsOnDay(day: Date | null): Event[] {
     if (!day) return [];
     return events.filter(e => isSameDay(new Date(e.date), day));
+  }
+
+  function toLocalDatetimeString(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:00`;
+  }
+
+  function openCreateOnDay(day: Date) {
+    createDate = toLocalDatetimeString(day);
+    showCreate = true;
+  }
+
+  function handleDayClick(e: MouseEvent, day: Date) {
+    // only open if the click wasn't on an event button
+    if ((e.target as HTMLElement).closest('[data-event]')) return;
+    openCreateOnDay(day);
   }
 
   const MONTHS = ['January','February','March','April','May','June',
@@ -79,17 +94,9 @@
       <Calendar class="w-5 h-5 text-primary" />
       <span class="font-semibold text-base">Legacy</span>
     </div>
-    <div class="flex items-center gap-2">
-      <button
-        on:click={() => (showCreate = true)}
-        class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/80 transition"
-      >
-        <Plus class="w-4 h-4" /> New Event
-      </button>
-      <a href="/account" class="inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition">
-        <User class="w-4 h-4" />
-      </a>
-    </div>
+    <a href="/account" class="inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition">
+      <User class="w-4 h-4" />
+    </a>
   </header>
 
   <!-- Month nav -->
@@ -118,21 +125,39 @@
       {#each calendarDays as day, i}
         {@const dayEvents = eventsOnDay(day)}
         {@const isToday = day ? isSameDay(day, today) : false}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
         <div
+          on:click={(e) => day && handleDayClick(e, day)}
           class={cn(
-            'min-h-[80px] border-b border-r border-border/30 p-1.5 flex flex-col gap-0.5',
+            'group min-h-[80px] border-b border-r border-border/30 p-1.5 flex flex-col gap-0.5 relative',
             !day && 'bg-muted/20',
+            day && 'cursor-pointer hover:bg-muted/30 transition-colors',
             i % 7 === 0 && 'border-l'
           )}
         >
           {#if day}
+            <!-- plus icon, visible on group hover -->
+            <button
+              data-event
+              on:click|stopPropagation={() => openCreateOnDay(day)}
+              class="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded
+                     opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+              tabindex="-1"
+              aria-label="Add event"
+            >
+              <Plus class="w-3 h-3 text-muted-foreground" />
+            </button>
+
             <span class={cn(
               'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full self-end',
               isToday ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
             )}>{day.getDate()}</span>
+
             {#each dayEvents.slice(0, 3) as event}
               <button
-                on:click={() => openDetail(event)}
+                data-event
+                on:click|stopPropagation={() => openDetail(event)}
                 class="w-full text-left text-xs px-1.5 py-0.5 rounded truncate"
                 style="background: {event.color ?? 'hsl(var(--primary) / 0.15)'}; color: inherit;"
               >{event.title}</button>
@@ -147,16 +172,15 @@
   {/if}
 </div>
 
-<!-- Event create/edit modal -->
 {#if showCreate || editingEvent}
   <EventModal
     event={editingEvent}
-    on:saved={() => { showCreate = false; editingEvent = null; loadEvents(); }}
-    on:cancel={() => { showCreate = false; editingEvent = null; }}
+    defaultDate={createDate}
+    on:saved={() => { showCreate = false; editingEvent = null; createDate = ''; loadEvents(); }}
+    on:cancel={() => { showCreate = false; editingEvent = null; createDate = ''; }}
   />
 {/if}
 
-<!-- Event detail panel -->
 {#if detailEvent}
   <EventDetail
     event={detailEvent}
