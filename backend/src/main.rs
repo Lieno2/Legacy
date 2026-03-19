@@ -57,6 +57,7 @@ use routes::{auth as auth_routes, events, rsvp, account, admin, invites, polls};
         polls::upsert_poll,
         polls::delete_poll,
         polls::answer_poll,
+        polls::get_voters,
     ),
     components(
         schemas(
@@ -90,6 +91,8 @@ use routes::{auth as auth_routes, events, rsvp, account, admin, invites, polls};
             polls::PollResponse,
             polls::CreatePollRequest,
             polls::AnswerPollRequest,
+            polls::VoterEntry,
+            polls::ChoiceVoters,
         )
     ),
     tags(

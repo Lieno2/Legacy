@@ -1,16 +1,18 @@
 <!--
   PollEditor — used inside EventModal to let the creator define a poll.
   Props:
-    enabled  (bind) — whether the poll toggle is on
-    question (bind) — the poll question string
-    choices  (bind) — string[] of choice labels
+    enabled        (bind) — whether the poll toggle is on
+    question       (bind) — the poll question string
+    choices        (bind) — string[] of choice labels
+    allowMultiple  (bind) — whether users can pick more than one choice
 -->
 <script lang="ts">
   import { Plus, Trash2, HelpCircle } from 'lucide-svelte';
 
-  export let enabled  = false;
-  export let question = '';
+  export let enabled       = false;
+  export let question      = '';
   export let choices: string[] = ['', ''];
+  export let allowMultiple = false;
 
   function addChoice() {
     if (choices.length < 6) choices = [...choices, ''];
@@ -98,6 +100,18 @@
           </button>
         {/if}
       </div>
+
+      <!-- Allow multiple toggle -->
+      <label class="flex items-center justify-between cursor-pointer select-none">
+        <span class="text-xs text-muted-foreground">Allow multiple selections</span>
+        <div class="relative">
+          <input type="checkbox" bind:checked={allowMultiple} class="sr-only peer" />
+          <div class="w-9 h-5 rounded-full border transition-colors duration-200
+                      bg-muted border-border peer-checked:bg-primary peer-checked:border-primary"></div>
+          <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm
+                      transition-transform duration-200 peer-checked:translate-x-4"></div>
+        </div>
+      </label>
     </div>
   {/if}
 </div>

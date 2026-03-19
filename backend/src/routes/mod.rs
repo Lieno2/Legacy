@@ -36,4 +36,5 @@ pub fn all_routes() -> Router<AppState> {
         .route("/admin/audit/revert", post(admin::revert_audit))
         .route("/polls",              get(polls::get_poll).post(polls::upsert_poll).delete(polls::delete_poll))
         .route("/polls/answer",       post(polls::answer_poll))
+        .route("/polls/voters",       get(polls::get_voters))
 }

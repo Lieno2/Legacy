@@ -22,9 +22,9 @@
 
   // ── Poll state ────────────────────────────────────────────────────────────
   let poll: Poll | null = null;
-  let pendingRsvpStatus: RsvpStatus | null = null;  // held while poll modal is open
+  let pendingRsvpStatus: RsvpStatus | null = null;
   let pollAnswerSaving = false;
-  $: showPollModal = pendingRsvpStatus !== null && poll !== null && poll.my_choice_id === null;
+  $: showPollModal = pendingRsvpStatus !== null && poll !== null && poll.my_choice_ids.length === 0;
 
   onMount(async () => {
     await Promise.all([loadMembers(), loadPoll()]);
@@ -51,10 +51,8 @@
     }
   }
 
-  // Called when user clicks Going / Late / Not going
   async function rsvp(status: RsvpStatus) {
-    // If there's an unanswered poll and status is going/late, show poll modal first
-    if (poll && poll.my_choice_id === null && (status === 'going' || status === 'late')) {
+    if (poll && poll.my_choice_ids.length === 0 && (status === 'going' || status === 'late')) {
       pendingRsvpStatus = status;
       return;
     }
@@ -82,19 +80,17 @@
     }
   }
 
-  // Poll modal confirmed — save answer then submit RSVP
-  async function onPollConfirm(e: CustomEvent<{ choiceId: number }>) {
+  async function onPollConfirm(e: CustomEvent<{ choiceIds: number[] }>) {
     if (!poll || !pendingRsvpStatus) return;
     pollAnswerSaving = true;
     try {
       await apiFetch('/api/polls/answer', {
         method: 'POST',
-        body: JSON.stringify({ poll_id: poll.id, choice_id: e.detail.choiceId })
+        body: JSON.stringify({ poll_id: poll.id, choice_ids: e.detail.choiceIds })
       });
-      // Optimistically update so the modal doesn't re-open
-      poll = { ...poll, my_choice_id: e.detail.choiceId };
+      poll = { ...poll, my_choice_ids: e.detail.choiceIds };
       await submitRsvp(pendingRsvpStatus);
-      await loadPoll(); // refresh counts
+      await loadPoll();
     } catch (err: unknown) {
       rsvpError = err instanceof Error ? err.message : 'Failed to save poll answer';
     } finally {
@@ -103,7 +99,6 @@
     }
   }
 
-  // User skipped the poll — just submit the RSVP
   async function onPollSkip() {
     const status = pendingRsvpStatus;
     pendingRsvpStatus = null;
@@ -140,7 +135,6 @@
   const STATUS_LABEL: Record<RsvpStatus, string> = { going: 'Going', late: 'Late', not_going: 'Not going' };
 </script>
 
-<!-- Poll answer modal — rendered above the detail modal -->
 {#if showPollModal && poll}
   <PollAnswerModal
     {poll}
@@ -247,7 +241,6 @@
           </div>
         {/if}
 
-        <!-- Late minutes stepper -->
         {#if myStatus === 'late'}
           <div class="flex items-center gap-2 bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2.5">
             <Timer class="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -286,7 +279,6 @@
           <Users class="w-3.5 h-3.5" />
           Attendees {#if !membersLoading}({members.length}){/if}
         </div>
-
         {#if membersLoading}
           <div class="flex items-center gap-2 text-xs text-muted-foreground py-1">
             <Loader2 class="w-3.5 h-3.5 animate-spin" /> Loading...

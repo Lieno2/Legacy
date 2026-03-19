@@ -44,22 +44,23 @@
   let fieldErrors: Record<string, string> = {};
 
   // ── Poll state ────────────────────────────────────────────────────────────
-  let pollEnabled  = false;
-  let pollQuestion = '';
+  let pollEnabled      = false;
+  let pollQuestion     = '';
   let pollChoices: string[] = ['', ''];
+  let pollAllowMultiple = false;
 
-  // Load existing poll when editing
   $: if (event?.id) loadExistingPoll(event.id);
 
   async function loadExistingPoll(eventId: number) {
     try {
       const existing = await apiFetch<Poll | null>(`/api/polls?event_id=${eventId}`);
       if (existing) {
-        pollEnabled  = true;
-        pollQuestion = existing.question;
-        pollChoices  = existing.choices.map(c => c.label);
+        pollEnabled       = true;
+        pollQuestion      = existing.question;
+        pollChoices       = existing.choices.map(c => c.label);
+        pollAllowMultiple = existing.allow_multiple;
       }
-    } catch { /* no poll exists */ }
+    } catch { /* no poll */ }
   }
 
   // ── Invite state ──────────────────────────────────────────────────────────
@@ -73,9 +74,7 @@
   $: savedEventId = event?.id ?? null;
   $: showAccessPanel = isPrivate && savedEventId !== null;
 
-  $: if (showAccessPanel && savedEventId) {
-    loadInvited(savedEventId);
-  }
+  $: if (showAccessPanel && savedEventId) loadInvited(savedEventId);
 
   async function loadInvited(id: number) {
     try {
@@ -101,14 +100,11 @@
     if (!savedEventId) return;
     inviteLoading[u.id] = true;
     try {
-      await apiFetch('/api/invites', {
-        method: 'POST',
-        body: JSON.stringify({ event_id: savedEventId, user_id: u.id })
-      });
+      await apiFetch('/api/invites', { method: 'POST', body: JSON.stringify({ event_id: savedEventId, user_id: u.id }) });
       searchResults = searchResults.filter(r => r.id !== u.id);
       searchQ = '';
       await loadInvited(savedEventId);
-    } catch { /* ignore */ }
+    } catch { }
     finally { inviteLoading[u.id] = false; }
   }
 
@@ -116,12 +112,9 @@
     if (!savedEventId) return;
     inviteLoading[u.id] = true;
     try {
-      await apiFetch('/api/invites', {
-        method: 'DELETE',
-        body: JSON.stringify({ event_id: savedEventId, user_id: u.id })
-      });
+      await apiFetch('/api/invites', { method: 'DELETE', body: JSON.stringify({ event_id: savedEventId, user_id: u.id }) });
       await loadInvited(savedEventId);
-    } catch { /* ignore */ }
+    } catch { }
     finally { inviteLoading[u.id] = false; }
   }
 
@@ -135,8 +128,7 @@
     if (!dateVal)       fieldErrors.date  = 'Date is required';
     if (pollEnabled) {
       if (!pollQuestion.trim()) fieldErrors.poll = 'Poll question is required';
-      const filled = pollChoices.filter(c => c.trim());
-      if (filled.length < 2) fieldErrors.poll = 'At least 2 choices are required';
+      else if (pollChoices.filter(c => c.trim()).length < 2) fieldErrors.poll = 'At least 2 choices are required';
     }
     return Object.keys(fieldErrors).length === 0;
   }
@@ -146,14 +138,7 @@
     saving = true;
     try {
       const iso = `${dateVal}T${timeVal}:00Z`;
-      const body = {
-        title:       title.trim(),
-        description: description.trim() || null,
-        date:        iso,
-        location:    location.trim() || null,
-        color,
-        private:     isPrivate
-      };
+      const body = { title: title.trim(), description: description.trim() || null, date: iso, location: location.trim() || null, color, private: isPrivate };
 
       let savedId: number;
       if (event) {
@@ -164,21 +149,13 @@
         savedId = created.id;
       }
 
-      // Save or delete poll
       if (pollEnabled) {
         await apiFetch('/api/polls', {
           method: 'POST',
-          body: JSON.stringify({
-            event_id: savedId,
-            question: pollQuestion.trim(),
-            choices:  pollChoices.filter(c => c.trim())
-          })
+          body: JSON.stringify({ event_id: savedId, question: pollQuestion.trim(), choices: pollChoices.filter(c => c.trim()), allow_multiple: pollAllowMultiple })
         });
       } else if (event?.id) {
-        // Toggle was turned off while editing — remove existing poll
-        try {
-          await apiFetch(`/api/polls?event_id=${event.id}`, { method: 'DELETE' });
-        } catch { /* no poll existed, ignore */ }
+        try { await apiFetch(`/api/polls?event_id=${event.id}`, { method: 'DELETE' }); } catch { }
       }
 
       dispatch('saved');
@@ -221,10 +198,8 @@
     <div class="flex items-center gap-2.5 px-5 py-4 border-b border-border">
       <div class="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
         style="background:{color}20; border:1px solid {color}40;">
-        {#if event}
-          <Edit3 class="w-3.5 h-3.5" style="color:{color};" />
-        {:else}
-          <Plus class="w-3.5 h-3.5" style="color:{color};" />
+        {#if event}<Edit3 class="w-3.5 h-3.5" style="color:{color};" />
+        {:else}<Plus class="w-3.5 h-3.5" style="color:{color};" />
         {/if}
       </div>
       <h2 class="text-sm font-semibold flex-1 leading-tight">
@@ -238,20 +213,13 @@
 
     <div class="flex flex-col gap-4 p-5 overflow-y-auto max-h-[85vh]">
 
-      <!-- Title -->
       <div class="flex flex-col gap-1.5">
         <label for="ev-title" class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
-        <input id="ev-title" bind:value={title} placeholder="e.g. Team meeting"
-          class={inputCls('title')}
+        <input id="ev-title" bind:value={title} placeholder="e.g. Team meeting" class={inputCls('title')}
           on:input={() => { delete fieldErrors.title; fieldErrors = fieldErrors; }} />
-        {#if fieldErrors.title}
-          <p class="flex items-center gap-1 text-xs text-red-400">
-            <AlertCircle class="w-3 h-3 shrink-0" /> {fieldErrors.title}
-          </p>
-        {/if}
+        {#if fieldErrors.title}<p class="flex items-center gap-1 text-xs text-red-400"><AlertCircle class="w-3 h-3 shrink-0" /> {fieldErrors.title}</p>{/if}
       </div>
 
-      <!-- Date + Time -->
       <div class="grid grid-cols-2 gap-3">
         <div class="flex flex-col gap-1.5">
           <label for="ev-date" class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
@@ -259,11 +227,7 @@
           </label>
           <input id="ev-date" type="date" bind:value={dateVal} class={inputCls('date')}
             on:change={() => { delete fieldErrors.date; fieldErrors = fieldErrors; }} />
-          {#if fieldErrors.date}
-            <p class="flex items-center gap-1 text-xs text-red-400">
-              <AlertCircle class="w-3 h-3 shrink-0" /> {fieldErrors.date}
-            </p>
-          {/if}
+          {#if fieldErrors.date}<p class="flex items-center gap-1 text-xs text-red-400"><AlertCircle class="w-3 h-3 shrink-0" /> {fieldErrors.date}</p>{/if}
         </div>
         <div class="flex flex-col gap-1.5">
           <label for="ev-time" class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
@@ -273,28 +237,23 @@
         </div>
       </div>
 
-      <!-- Description -->
       <div class="flex flex-col gap-1.5">
         <label for="ev-desc" class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           <AlignLeft class="w-3 h-3" /> Description
           <span class="normal-case font-normal text-muted-foreground/50 ml-0.5">(optional)</span>
         </label>
-        <textarea id="ev-desc" bind:value={description} rows="3"
-          placeholder="Add more details about this event..."
+        <textarea id="ev-desc" bind:value={description} rows="3" placeholder="Add more details about this event..."
           class="{BASE_INPUT} py-2 resize-none border-input"></textarea>
       </div>
 
-      <!-- Location -->
       <div class="flex flex-col gap-1.5">
         <label for="ev-loc" class="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           <MapPin class="w-3 h-3" /> Location
           <span class="normal-case font-normal text-muted-foreground/50 ml-0.5">(optional)</span>
         </label>
-        <input id="ev-loc" bind:value={location} placeholder="Office, Zoom link, address..."
-          class="{BASE_INPUT} h-9 border-input" />
+        <input id="ev-loc" bind:value={location} placeholder="Office, Zoom link, address..." class="{BASE_INPUT} h-9 border-input" />
       </div>
 
-      <!-- Color + Private -->
       <div class="flex items-end justify-between gap-4 pt-1 border-t border-border">
         <div class="flex flex-col gap-1.5">
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Color</span>
@@ -309,15 +268,11 @@
           </div>
         </div>
         <label for="ev-private" class="flex items-center gap-2 cursor-pointer select-none shrink-0 pb-1">
-          <span class="text-sm text-muted-foreground flex items-center gap-1.5">
-            <Lock class="w-3.5 h-3.5" /> Private
-          </span>
+          <span class="text-sm text-muted-foreground flex items-center gap-1.5"><Lock class="w-3.5 h-3.5" /> Private</span>
           <div class="relative">
             <input id="ev-private" type="checkbox" bind:checked={isPrivate} class="sr-only peer" />
-            <div class="w-9 h-5 rounded-full border transition-colors duration-200
-                        bg-muted border-border peer-checked:bg-primary peer-checked:border-primary"></div>
-            <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm
-                        transition-transform duration-200 peer-checked:translate-x-4"></div>
+            <div class="w-9 h-5 rounded-full border transition-colors duration-200 bg-muted border-border peer-checked:bg-primary peer-checked:border-primary"></div>
+            <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 peer-checked:translate-x-4"></div>
           </div>
         </label>
       </div>
@@ -327,6 +282,7 @@
         bind:enabled={pollEnabled}
         bind:question={pollQuestion}
         bind:choices={pollChoices}
+        bind:allowMultiple={pollAllowMultiple}
       />
       {#if fieldErrors.poll}
         <p class="flex items-center gap-1 text-xs text-red-400 -mt-2">
@@ -334,7 +290,6 @@
         </p>
       {/if}
 
-      <!-- Manage Access (private + existing event only) -->
       {#if showAccessPanel}
         <div class="flex flex-col gap-3 pt-1 border-t border-border">
           <div class="flex items-center gap-2">
@@ -342,74 +297,45 @@
             <span class="text-xs font-semibold text-foreground">Manage Access</span>
           </div>
           <p class="text-xs text-muted-foreground -mt-1">Add people who can see this private event and RSVP to it.</p>
-
           <div class="relative">
             <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-            <input
-              bind:value={searchQ}
-              on:input={onSearchInput}
-              placeholder="Search by username or email..."
-              class="{BASE_INPUT} h-9 border-input pl-8"
-            />
-            {#if searchLoading}
-              <Loader2 class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground animate-spin" />
-            {/if}
+            <input bind:value={searchQ} on:input={onSearchInput} placeholder="Search by username or email..."
+              class="{BASE_INPUT} h-9 border-input pl-8" />
+            {#if searchLoading}<Loader2 class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground animate-spin" />{/if}
           </div>
-
           {#if searchResults.length > 0}
             <div class="flex flex-col gap-px rounded-xl border border-border bg-muted/30 overflow-hidden -mt-1">
               {#each searchResults as u}
-                <button
-                  type="button"
-                  on:click={() => addInvite(u)}
-                  disabled={inviteLoading[u.id]}
-                  class="flex items-center gap-3 px-3 py-2 hover:bg-muted transition text-left disabled:opacity-50"
-                >
-                  <div
-                    class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold uppercase shrink-0"
-                    style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);"
-                  >{u.username[0]}</div>
+                <button type="button" on:click={() => addInvite(u)} disabled={inviteLoading[u.id]}
+                  class="flex items-center gap-3 px-3 py-2 hover:bg-muted transition text-left disabled:opacity-50">
+                  <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold uppercase shrink-0"
+                    style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);">{u.username[0]}</div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium truncate">{u.username}</p>
                     <p class="text-xs text-muted-foreground truncate">{u.email}</p>
                   </div>
-                  {#if inviteLoading[u.id]}
-                    <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                  {:else}
-                    <Plus class="w-3.5 h-3.5 text-muted-foreground" />
-                  {/if}
+                  {#if inviteLoading[u.id]}<Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                  {:else}<Plus class="w-3.5 h-3.5 text-muted-foreground" />{/if}
                 </button>
               {/each}
             </div>
           {/if}
-
           {#if invited.length > 0}
             <div class="flex flex-col gap-1">
               <p class="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Invited ({invited.length})</p>
               {#each invited as u}
                 <div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-muted/20 border border-border">
-                  <div
-                    class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold uppercase shrink-0"
-                    style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);"
-                  >{u.username[0]}</div>
+                  <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold uppercase shrink-0"
+                    style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);">{u.username[0]}</div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium truncate">{u.username}</p>
                     <p class="text-xs text-muted-foreground truncate">{u.email}</p>
                   </div>
-                  <button
-                    type="button"
-                    on:click={() => removeInvite(u)}
-                    disabled={inviteLoading[u.id]}
+                  <button type="button" on:click={() => removeInvite(u)} disabled={inviteLoading[u.id]}
                     aria-label="Remove {u.username}"
-                    class="w-6 h-6 rounded-md flex items-center justify-center
-                           text-muted-foreground hover:text-red-400 hover:bg-red-500/10
-                           transition disabled:opacity-40"
-                  >
-                    {#if inviteLoading[u.id]}
-                      <Loader2 class="w-3.5 h-3.5 animate-spin" />
-                    {:else}
-                      <UserMinus class="w-3.5 h-3.5" />
-                    {/if}
+                    class="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-40">
+                    {#if inviteLoading[u.id]}<Loader2 class="w-3.5 h-3.5 animate-spin" />
+                    {:else}<UserMinus class="w-3.5 h-3.5" />{/if}
                   </button>
                 </div>
               {/each}
@@ -425,7 +351,6 @@
         </div>
       {/if}
 
-      <!-- Global error -->
       {#if fieldErrors.global}
         <div class="flex items-start gap-2.5 px-3 py-3 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl">
           <AlertCircle class="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
@@ -433,7 +358,6 @@
         </div>
       {/if}
 
-      <!-- Actions -->
       <div class="flex gap-2 pt-1">
         <button type="button" on:click={() => dispatch('cancel')}
           class="flex-1 h-9 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition"

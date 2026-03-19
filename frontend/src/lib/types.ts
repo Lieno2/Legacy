@@ -43,6 +43,18 @@ export interface Poll {
   id: number;
   event_id: number;
   question: string;
+  allow_multiple: boolean;
   choices: PollChoice[];
-  my_choice_id: number | null;
+  my_choice_ids: number[];
+}
+
+export interface VoterEntry {
+  user_id: string;
+  username: string;
+}
+
+export interface ChoiceVoters {
+  choice_id: number;
+  label: string;
+  voters: VoterEntry[];
 }
