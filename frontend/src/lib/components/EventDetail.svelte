@@ -2,8 +2,10 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { apiFetch } from '$lib/api';
   import { formatDate, formatTime } from '$lib/utils';
-  import type { Event, EventMember, RsvpStatus } from '$lib/types';
+  import type { Event, EventMember, RsvpStatus, Poll } from '$lib/types';
   import { X, MapPin, Clock, Lock, Pencil, Trash2, Users, Check, Timer, XCircle, AlertCircle, Loader2, Minus, Plus } from 'lucide-svelte';
+  import PollAnswerModal from './PollAnswerModal.svelte';
+  import PollResults from './PollResults.svelte';
 
   export let event: Event;
   export let currentUserId: string | null;
@@ -18,7 +20,21 @@
   let membersError = '';
   let rsvpError = '';
 
-  onMount(async () => { await loadMembers(); });
+  // ── Poll state ────────────────────────────────────────────────────────────
+  let poll: Poll | null = null;
+  let pendingRsvpStatus: RsvpStatus | null = null;  // held while poll modal is open
+  let pollAnswerSaving = false;
+  $: showPollModal = pendingRsvpStatus !== null && poll !== null && poll.my_choice_id === null;
+
+  onMount(async () => {
+    await Promise.all([loadMembers(), loadPoll()]);
+  });
+
+  async function loadPoll() {
+    try {
+      poll = await apiFetch<Poll | null>(`/api/polls?event_id=${event.id}`);
+    } catch { poll = null; }
+  }
 
   async function loadMembers() {
     membersLoading = true;
@@ -35,14 +51,24 @@
     }
   }
 
+  // Called when user clicks Going / Late / Not going
   async function rsvp(status: RsvpStatus) {
+    // If there's an unanswered poll and status is going/late, show poll modal first
+    if (poll && poll.my_choice_id === null && (status === 'going' || status === 'late')) {
+      pendingRsvpStatus = status;
+      return;
+    }
+    await submitRsvp(status);
+  }
+
+  async function submitRsvp(status: RsvpStatus) {
     rsvpLoading = true;
     rsvpError = '';
     try {
       await apiFetch('/api/rsvp', {
         method: 'POST',
         body: JSON.stringify({
-          event_id: event.id,
+          event_id:    event.id,
           status,
           late_minutes: status === 'late' ? (lateMinutes || null) : null
         })
@@ -54,6 +80,34 @@
     } finally {
       rsvpLoading = false;
     }
+  }
+
+  // Poll modal confirmed — save answer then submit RSVP
+  async function onPollConfirm(e: CustomEvent<{ choiceId: number }>) {
+    if (!poll || !pendingRsvpStatus) return;
+    pollAnswerSaving = true;
+    try {
+      await apiFetch('/api/polls/answer', {
+        method: 'POST',
+        body: JSON.stringify({ poll_id: poll.id, choice_id: e.detail.choiceId })
+      });
+      // Optimistically update so the modal doesn't re-open
+      poll = { ...poll, my_choice_id: e.detail.choiceId };
+      await submitRsvp(pendingRsvpStatus);
+      await loadPoll(); // refresh counts
+    } catch (err: unknown) {
+      rsvpError = err instanceof Error ? err.message : 'Failed to save poll answer';
+    } finally {
+      pollAnswerSaving = false;
+      pendingRsvpStatus = null;
+    }
+  }
+
+  // User skipped the poll — just submit the RSVP
+  async function onPollSkip() {
+    const status = pendingRsvpStatus;
+    pendingRsvpStatus = null;
+    if (status) await submitRsvp(status);
   }
 
   function handleBackdropKey(e: KeyboardEvent) {
@@ -70,6 +124,7 @@
   }
 
   $: isOwner = currentUserId != null && currentUserId === event.created_by;
+  $: eventColor = event.color ?? '#6366f1';
 
   const RSVP_BTNS: { status: RsvpStatus; label: string; icon: any; active: string }[] = [
     { status: 'going',     label: 'Going',       icon: Check,   active: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' },
@@ -85,6 +140,17 @@
   const STATUS_LABEL: Record<RsvpStatus, string> = { going: 'Going', late: 'Late', not_going: 'Not going' };
 </script>
 
+<!-- Poll answer modal — rendered above the detail modal -->
+{#if showPollModal && poll}
+  <PollAnswerModal
+    {poll}
+    {eventColor}
+    saving={pollAnswerSaving}
+    on:confirm={onPollConfirm}
+    on:skip={onPollSkip}
+  />
+{/if}
+
 <!-- svelte-ignore a11y_interactive_supports_focus -->
 <div
   class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
@@ -99,7 +165,7 @@
     class="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden"
     style="animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both;"
   >
-    <div class="h-0.5 w-full" style="background:{event.color ?? '#6366f1'};"></div>
+    <div class="h-0.5 w-full" style="background:{eventColor};"></div>
 
     <div class="p-5 flex flex-col gap-4">
       <!-- Header -->
@@ -151,7 +217,7 @@
         <p class="text-sm text-muted-foreground leading-relaxed">{event.description}</p>
       {/if}
 
-      <!-- RSVP — always visible for all logged-in users -->
+      <!-- RSVP -->
       <div class="border-t border-border pt-4 flex flex-col gap-2.5">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Will you attend?</p>
         <div class="grid grid-cols-3 gap-1.5">
@@ -181,47 +247,31 @@
           </div>
         {/if}
 
-        <!-- Late minutes stepper + editable input -->
+        <!-- Late minutes stepper -->
         {#if myStatus === 'late'}
           <div class="flex items-center gap-2 bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2.5">
             <Timer class="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span class="text-xs text-muted-foreground flex-1">Minutes late</span>
             <div class="flex items-center gap-1">
-              <button
-                type="button"
-                on:click={() => clampMinutes(lateMinutes - 5)}
-                disabled={lateMinutes <= 1}
+              <button type="button" on:click={() => clampMinutes(lateMinutes - 5)} disabled={lateMinutes <= 1}
                 aria-label="Decrease"
-                class="w-6 h-6 rounded-md flex items-center justify-center
-                       bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground
-                       transition active:scale-90 disabled:opacity-30"
+                class="w-6 h-6 rounded-md flex items-center justify-center bg-muted hover:bg-muted/80
+                       text-muted-foreground hover:text-foreground transition active:scale-90 disabled:opacity-30"
               ><Minus class="w-3 h-3" /></button>
-
-              <input
-                type="number"
-                min="1" max="120"
-                value={lateMinutes}
-                on:change={onMinutesInput}
-                on:blur={onMinutesInput}
+              <input type="number" min="1" max="120" value={lateMinutes}
+                on:change={onMinutesInput} on:blur={onMinutesInput}
                 class="w-10 text-center text-sm font-semibold tabular-nums text-amber-400
-                       bg-transparent border border-amber-500/25 rounded-md
-                       outline-none focus:border-amber-400/60 transition
+                       bg-transparent border border-amber-500/25 rounded-md outline-none
+                       focus:border-amber-400/60 transition
                        [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-
-              <button
-                type="button"
-                on:click={() => clampMinutes(lateMinutes + 5)}
-                disabled={lateMinutes >= 120}
+              <button type="button" on:click={() => clampMinutes(lateMinutes + 5)} disabled={lateMinutes >= 120}
                 aria-label="Increase"
-                class="w-6 h-6 rounded-md flex items-center justify-center
-                       bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground
-                       transition active:scale-90 disabled:opacity-30"
+                class="w-6 h-6 rounded-md flex items-center justify-center bg-muted hover:bg-muted/80
+                       text-muted-foreground hover:text-foreground transition active:scale-90 disabled:opacity-30"
               ><Plus class="w-3 h-3" /></button>
             </div>
-            <button
-              on:click={() => rsvp('late')}
-              disabled={rsvpLoading}
+            <button on:click={() => submitRsvp('late')} disabled={rsvpLoading}
               class="h-6 px-2.5 rounded-md bg-amber-500/15 border border-amber-500/25
                      text-xs font-medium text-amber-400 hover:bg-amber-500/25
                      transition active:scale-95 disabled:opacity-40 shrink-0"
@@ -267,6 +317,13 @@
           </div>
         {/if}
       </div>
+
+      <!-- Poll results -->
+      {#if poll}
+        <div class="border-t border-border pt-4">
+          <PollResults {poll} {eventColor} />
+        </div>
+      {/if}
     </div>
   </div>
 </div>

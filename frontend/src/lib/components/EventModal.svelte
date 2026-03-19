@@ -1,8 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher, tick } from 'svelte';
   import { apiFetch } from '$lib/api';
-  import type { Event } from '$lib/types';
+  import type { Event, Poll } from '$lib/types';
   import { X, MapPin, AlignLeft, Lock, Calendar, Clock, Edit3, Plus, AlertCircle, Search, UserMinus, Loader2 } from 'lucide-svelte';
+  import PollEditor from './PollEditor.svelte';
 
   export let event: Event | null = null;
   export let defaultDate: string = '';
@@ -42,7 +43,26 @@
   let saving      = false;
   let fieldErrors: Record<string, string> = {};
 
-  // ── Invite state (only relevant for existing private events) ──────────────
+  // ── Poll state ────────────────────────────────────────────────────────────
+  let pollEnabled  = false;
+  let pollQuestion = '';
+  let pollChoices: string[] = ['', ''];
+
+  // Load existing poll when editing
+  $: if (event?.id) loadExistingPoll(event.id);
+
+  async function loadExistingPoll(eventId: number) {
+    try {
+      const existing = await apiFetch<Poll | null>(`/api/polls?event_id=${eventId}`);
+      if (existing) {
+        pollEnabled  = true;
+        pollQuestion = existing.question;
+        pollChoices  = existing.choices.map(c => c.label);
+      }
+    } catch { /* no poll exists */ }
+  }
+
+  // ── Invite state ──────────────────────────────────────────────────────────
   let searchQ       = '';
   let searchResults: InviteUser[] = [];
   let searchLoading = false;
@@ -53,7 +73,6 @@
   $: savedEventId = event?.id ?? null;
   $: showAccessPanel = isPrivate && savedEventId !== null;
 
-  // Load existing invites when editing a private event
   $: if (showAccessPanel && savedEventId) {
     loadInvited(savedEventId);
   }
@@ -114,6 +133,11 @@
     fieldErrors = {};
     if (!title.trim()) fieldErrors.title = 'Title is required';
     if (!dateVal)       fieldErrors.date  = 'Date is required';
+    if (pollEnabled) {
+      if (!pollQuestion.trim()) fieldErrors.poll = 'Poll question is required';
+      const filled = pollChoices.filter(c => c.trim());
+      if (filled.length < 2) fieldErrors.poll = 'At least 2 choices are required';
+    }
     return Object.keys(fieldErrors).length === 0;
   }
 
@@ -130,11 +154,33 @@
         color,
         private:     isPrivate
       };
+
+      let savedId: number;
       if (event) {
-        await apiFetch(`/api/events/${event.id}`, { method: 'PUT',  body: JSON.stringify(body) });
+        await apiFetch(`/api/events/${event.id}`, { method: 'PUT', body: JSON.stringify(body) });
+        savedId = event.id;
       } else {
-        await apiFetch('/api/events',              { method: 'POST', body: JSON.stringify(body) });
+        const created = await apiFetch<Event>('/api/events', { method: 'POST', body: JSON.stringify(body) });
+        savedId = created.id;
       }
+
+      // Save or delete poll
+      if (pollEnabled) {
+        await apiFetch('/api/polls', {
+          method: 'POST',
+          body: JSON.stringify({
+            event_id: savedId,
+            question: pollQuestion.trim(),
+            choices:  pollChoices.filter(c => c.trim())
+          })
+        });
+      } else if (event?.id) {
+        // Toggle was turned off while editing — remove existing poll
+        try {
+          await apiFetch(`/api/polls?event_id=${event.id}`, { method: 'DELETE' });
+        } catch { /* no poll existed, ignore */ }
+      }
+
       dispatch('saved');
     } catch (err: unknown) {
       fieldErrors.global = err instanceof Error ? err.message : 'Failed to save event';
@@ -276,6 +322,18 @@
         </label>
       </div>
 
+      <!-- Poll editor -->
+      <PollEditor
+        bind:enabled={pollEnabled}
+        bind:question={pollQuestion}
+        bind:choices={pollChoices}
+      />
+      {#if fieldErrors.poll}
+        <p class="flex items-center gap-1 text-xs text-red-400 -mt-2">
+          <AlertCircle class="w-3 h-3 shrink-0" /> {fieldErrors.poll}
+        </p>
+      {/if}
+
       <!-- Manage Access (private + existing event only) -->
       {#if showAccessPanel}
         <div class="flex flex-col gap-3 pt-1 border-t border-border">
@@ -285,7 +343,6 @@
           </div>
           <p class="text-xs text-muted-foreground -mt-1">Add people who can see this private event and RSVP to it.</p>
 
-          <!-- Search box -->
           <div class="relative">
             <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
             <input
@@ -299,7 +356,6 @@
             {/if}
           </div>
 
-          <!-- Search results dropdown -->
           {#if searchResults.length > 0}
             <div class="flex flex-col gap-px rounded-xl border border-border bg-muted/30 overflow-hidden -mt-1">
               {#each searchResults as u}
@@ -327,7 +383,6 @@
             </div>
           {/if}
 
-          <!-- Invited list -->
           {#if invited.length > 0}
             <div class="flex flex-col gap-1">
               <p class="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Invited ({invited.length})</p>
