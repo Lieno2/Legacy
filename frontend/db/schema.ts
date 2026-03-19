@@ -24,6 +24,7 @@ export const events = pgTable("Events", {
     private: boolean("private").notNull().default(false),
 })
 
+// RSVP members
 export const eventMembers = pgTable("EventMembers", {
     eventId: bigint("eventId", { mode: "number" }).notNull().references(() => events.id, { onDelete: "cascade" }),
     userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -34,7 +35,16 @@ export const eventMembers = pgTable("EventMembers", {
     pk: primaryKey({ columns: [t.eventId, t.userId] }),
 }))
 
-// Key-value store for app settings (Discord webhook URL, etc.)
+// Private event invite list — who can see a private event
+export const eventInvites = pgTable("EventInvites", {
+    eventId: bigint("eventId", { mode: "number" }).notNull().references(() => events.id, { onDelete: "cascade" }),
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    invitedAt: timestamp("invitedAt").defaultNow(),
+}, (t) => ({
+    pk: primaryKey({ columns: [t.eventId, t.userId] }),
+}))
+
+// Key-value store for app settings (Discord, etc.)
 export const settings = pgTable("Settings", {
     key: text("key").primaryKey(),
     value: text("value").notNull().default(""),

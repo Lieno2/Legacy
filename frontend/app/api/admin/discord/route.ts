@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { db } from "@/db"
-import { users, settings } from "@/db/schema"
+import { users } from "@/db/schema"
 import { eq } from "drizzle-orm"
+import { getDiscordSettings, saveDiscordSettings } from "@/lib/discord"
 
 async function requireAdmin(session: any): Promise<boolean> {
     if (!session?.user?.id) return false
@@ -15,28 +16,53 @@ export async function GET() {
     const session = await auth()
     if (!await requireAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-    const setting = await db.select().from(settings).where(eq(settings.key, "discord_webhook_url")).then(r => r[0])
-    return NextResponse.json({ webhookUrl: setting?.value || "" })
+    const discordSettings = await getDiscordSettings()
+    return NextResponse.json(discordSettings)
 }
 
 export async function PUT(req: NextRequest) {
     const session = await auth()
     if (!await requireAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-    const { webhookUrl } = await req.json()
+    try {
+        const body = await req.json()
+        const { webhookUrl, enabled, pingRoleId, templates } = body
 
-    // Basic validation
-    if (webhookUrl && !webhookUrl.startsWith("https://discord.com/api/webhooks/")) {
-        return NextResponse.json({ error: "Invalid Discord webhook URL" }, { status: 400 })
+        if (webhookUrl && !webhookUrl.startsWith("https://discord.com/api/webhooks/")) {
+            return NextResponse.json({ error: "Invalid Discord webhook URL — must start with https://discord.com/api/webhooks/" }, { status: 400 })
+        }
+
+        await saveDiscordSettings({
+            webhookUrl: webhookUrl ?? "",
+            enabled: Boolean(enabled),
+            pingRoleId: pingRoleId ?? "",
+            templates: {
+                created: templates?.created ?? "",
+                updated: templates?.updated ?? "",
+                deleted: templates?.deleted ?? "",
+            },
+        })
+
+        return NextResponse.json({ success: true })
+    } catch (error) {
+        console.error("Discord settings save error:", error)
+        return NextResponse.json({ error: "Failed to save settings" }, { status: 500 })
     }
+}
 
-    const existing = await db.select().from(settings).where(eq(settings.key, "discord_webhook_url")).then(r => r[0])
+// Test the webhook with a sample message
+export async function POST() {
+    const session = await auth()
+    if (!await requireAdmin(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-    if (existing) {
-        await db.update(settings).set({ value: webhookUrl || "" }).where(eq(settings.key, "discord_webhook_url"))
-    } else {
-        await db.insert(settings).values({ key: "discord_webhook_url", value: webhookUrl || "" })
-    }
+    const { sendDiscordNotification } = await import("@/lib/discord")
+    await sendDiscordNotification("created", {
+        title: "Test Event",
+        date: new Date(),
+        location: "Test Location",
+        description: "This is a test notification from Legacy Calendar.",
+        creatorName: session!.user!.name || "Admin",
+    })
 
     return NextResponse.json({ success: true })
 }
