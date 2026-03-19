@@ -40,9 +40,12 @@ pub async fn list(
 ) -> Result<Json<Vec<EventMember>>> {
     let members = sqlx::query_as::<_, EventMember>(
         r#"
-        SELECT em."eventId" AS event_id, em."userId" AS user_id,
-               u.username, em.status, em."lateMinutes" AS late_minutes,
-               em."joinedAt" AS joined_at
+        SELECT em."eventId"  AS event_id,
+               em."userId"   AS user_id,
+               u.username,
+               em.status,
+               em."lateMinutes" AS late_minutes,
+               em."joinedAt" AT TIME ZONE 'UTC' AS joined_at
         FROM "EventMembers" em
         LEFT JOIN "Users" u ON em."userId" = u.id
         WHERE em."eventId" = $1
@@ -90,8 +93,6 @@ pub async fn upsert(
 
     let late_minutes = if body.status == "late" { body.late_minutes } else { None };
 
-    // Only insert the columns that are defined without defaults other than joinedAt.
-    // username is a denormalized column — skip it here and rely on the JOIN in list().
     sqlx::query(
         r#"
         INSERT INTO "EventMembers" ("eventId", "userId", status, "lateMinutes")
