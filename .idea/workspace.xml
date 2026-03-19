@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="5d9996ca-9a9b-49ac-a6c5-6b94daf7fc9c" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Legacy.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/codebase.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/.env.example" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/postcss.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/postcss.config.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/app.css" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/app.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/app.html" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/app.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/lib/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/lib/components/EventDetail.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/lib/components/EventDetail.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/lib/components/EventModal.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/lib/components/EventModal.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/lib/stores.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/lib/stores.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/lib/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/lib/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/lib/utils.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/lib/utils.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/routes/+layout.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/routes/+layout.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/routes/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/routes/+page.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/routes/account/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/routes/account/+page.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/routes/admin/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/routes/admin/+page.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/routes/calendar/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/routes/calendar/+page.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/src/routes/login/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/src/routes/login/+page.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/svelte.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/svelte.config.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/tailwind.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/tailwind.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/tsconfig.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/tsconfig.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend-svelte/vite.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/frontend-svelte/vite.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/.env.example" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/account/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/admin/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/account/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/admin/discord/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/admin/events/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/admin/users/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/auth/[...nextauth]/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/events/invites/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/events/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/routes/[id]/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/routes/auth/[...nextauth]/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/routes/auth/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/routes/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/api/rsvp/route.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/calendar/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/favicon.ico" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/globals.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/layout.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/login/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/auth.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/bun.lock" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ThemeProvider.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/calendar/CalendarGrid.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/calendar/CalendarHeader.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/calendar/DeleteConfirmDialog.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/calendar/EventDetailDialog.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/calendar/EventFormDialog.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/calendar/index.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/calendar/types.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/calendar/utils.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/badge.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/button.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/card.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/dialog.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/input.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/label.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/popover.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/select.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/textarea.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/index.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/0000_brief_crystal.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/0001_strange_beyonder.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/0002_fix_user_id_type.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/0003_parched_nehzno.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/0004_common_texas_twister.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/0005_stormy_silver_fox.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/meta/0000_snapshot.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/meta/0001_snapshot.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/meta/0002_snapshot.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/meta/0003_snapshot.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/meta/0004_snapshot.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/meta/0005_snapshot.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/migrations/meta/_journal.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/schema.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/db/seed.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/drizzle.config.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/eslint.config.mjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/discord.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/utils.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/middleware.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/next.config.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/postcss.config.mjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/public/file.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/public/globe.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/public/next.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/public/vercel.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/public/window.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/scripts/init-db.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/scripts/run-migration.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/tsconfig.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/types/next-auth.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/script.sh" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Lieno2&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/Lieno2/Legacy.git&quot;,
+    &quot;accountId&quot;: &quot;c0158066-0b41-4497-9e4e-c42b32efa229&quot;
+  }
+}</component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="c3irrzf6" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="3BAKvRLx41L9phDqqN6xQoD78pU" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "rewrite",
+    "ignore.virus.scanning.warn.message": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/morga/Documents/GitHub/Legacy/frontend",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
+    "ts.external.directory.path": "C:\\Program Files\\JetBrains\\IntelliJ IDEA 2024.2.1\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\morga\Documents\GitHub\Legacy\frontend" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\morga\Documents\GitHub\Legacy\frontend\app\api\admin" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-9823dce3aa75-b114ca120d71-intellij.indexing.shared.core-IU-242.21829.227" />
+        <option value="bundled-js-predefined-d6986cc7102b-7c0b70fcd90d-JavaScript-IU-242.21829.227" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="5d9996ca-9a9b-49ac-a6c5-6b94daf7fc9c" name="Changes" comment="" />
+      <created>1773926664978</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1773926664978</updated>
+      <workItem from="1773926665992" duration="28000" />
+      <workItem from="1773926700195" duration="814000" />
+      <workItem from="1773927558128" duration="4986000" />
+      <workItem from="1773933793669" duration="1236000" />
+      <workItem from="1773936158991" duration="29000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="*.ps1" />
+  </component>
+</project>
