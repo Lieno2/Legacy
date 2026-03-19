@@ -7,7 +7,7 @@
   import EventModal from '$lib/components/EventModal.svelte';
   import EventDetail from '$lib/components/EventDetail.svelte';
   import { goto } from '$app/navigation';
-  import { ChevronLeft, ChevronRight, Search } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, Search, Plus, Lock, Clock } from 'lucide-svelte';
 
   let events: Event[] = [];
   let loading = true;
@@ -96,7 +96,6 @@
 <div class="h-screen bg-background text-foreground flex flex-col overflow-hidden">
   <!-- Top bar -->
   <header class="flex items-center gap-3 px-4 py-2.5 border-b border-border shrink-0">
-    <!-- Month nav -->
     <div class="flex items-center gap-0.5">
       <button on:click={prevMonth} class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
         <ChevronLeft class="w-4 h-4" />
@@ -113,7 +112,6 @@
 
     <div class="flex-1"></div>
 
-    <!-- Search -->
     <div class="relative">
       <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
       <input
@@ -125,7 +123,6 @@
       />
     </div>
 
-    <!-- User avatar -->
     <a href="/account"
       class="w-7 h-7 rounded-full bg-muted border border-border flex items-center justify-center
              text-xs font-semibold hover:ring-2 hover:ring-ring/50 transition select-none">
@@ -138,7 +135,7 @@
     {#each DAYS as d, i}
       <div class={cn(
         'py-2 text-center text-[11px] font-medium tracking-wider text-muted-foreground',
-        i === 0 || i === 6 ? 'text-muted-foreground/60' : ''
+        i === 0 || i === 6 ? 'opacity-50' : ''
       )}>{d}</div>
     {/each}
   </div>
@@ -175,19 +172,18 @@
                 'w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium select-none',
                 isToday
                   ? 'bg-primary text-primary-foreground font-semibold'
-                  : isWeekend
-                    ? 'text-muted-foreground/60'
-                    : 'text-muted-foreground'
+                  : isWeekend ? 'text-muted-foreground/60' : 'text-muted-foreground'
               )}>{day.getDate()}</span>
-
               <button
                 data-event
                 on:click|stopPropagation={() => openCreateOnDay(day)}
                 class="w-5 h-5 rounded-md flex items-center justify-center text-muted-foreground
                        opacity-0 group-hover:opacity-100 hover:bg-muted hover:text-foreground
-                       transition-all text-sm leading-none"
+                       transition-all"
                 tabindex="-1" aria-label="Add event"
-              >+</button>
+              >
+                <Plus class="w-3 h-3" />
+              </button>
             </div>
 
             <div class="flex flex-col gap-px px-1 pb-1 overflow-hidden">
@@ -200,8 +196,8 @@
                   style="background-color:{ev.color ?? '#6366f1'}26; color:{ev.color ?? '#a5b4fc'};
                          border-left: 2px solid {ev.color ?? '#6366f1'};"
                 >
-                  {#if ev.private}<span class="shrink-0 text-[10px]">🔒</span>{/if}
-                  {#if isSoon(ev)}<span class="shrink-0 text-[10px]">⏰</span>{/if}
+                  {#if ev.private}<Lock class="w-2.5 h-2.5 shrink-0 opacity-70" />{/if}
+                  {#if isSoon(ev)}<Clock class="w-2.5 h-2.5 shrink-0 opacity-70" />{/if}
                   <span class="truncate">{ev.title}</span>
                 </button>
               {/each}

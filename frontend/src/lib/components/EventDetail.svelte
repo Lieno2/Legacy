@@ -3,7 +3,7 @@
   import { apiFetch } from '$lib/api';
   import { formatDate, formatTime } from '$lib/utils';
   import type { Event, EventMember, RsvpStatus } from '$lib/types';
-  import { X, MapPin, Clock, Lock, Pencil, Trash2, Users } from 'lucide-svelte';
+  import { X, MapPin, Clock, Lock, Pencil, Trash2, Users, Check, Timer, XCircle } from 'lucide-svelte';
 
   export let event: Event;
   export let currentUserId: string | null;
@@ -38,10 +38,10 @@
 
   $: isOwner = currentUserId === event.created_by;
 
-  const RSVP_BTNS: { status: RsvpStatus; label: string; icon: string; cls: string }[] = [
-    { status: 'going',     label: 'Going',       icon: '✓', cls: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' },
-    { status: 'late',      label: 'Coming late', icon: '⏱', cls: 'border-amber-500/50  bg-amber-500/10  text-amber-400'  },
-    { status: 'not_going', label: 'Not going',   icon: '✕', cls: 'border-red-500/50    bg-red-500/10    text-red-400'    },
+  const RSVP_BTNS: { status: RsvpStatus; label: string; icon: any; active: string }[] = [
+    { status: 'going',     label: 'Going',       icon: Check,   active: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' },
+    { status: 'late',      label: 'Coming late', icon: Timer,   active: 'border-amber-500/50  bg-amber-500/10  text-amber-400'  },
+    { status: 'not_going', label: 'Not going',   icon: XCircle, active: 'border-red-500/50    bg-red-500/10    text-red-400'    },
   ];
 
   const STATUS_BADGE: Record<RsvpStatus, string> = {
@@ -52,14 +52,20 @@
   const STATUS_LABEL: Record<RsvpStatus, string> = { going: 'Going', late: 'Late', not_going: 'Not going' };
 </script>
 
-<div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
-  on:click|self={() => dispatch('close')} role="dialog">
-  <div class="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
-    <!-- Color accent bar -->
-    <div class="h-1" style="background:{event.color ?? '#6366f1'}"></div>
+<div
+  class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+  style="background:rgba(0,0,0,0.65); backdrop-filter:blur(4px);"
+  on:click|self={() => dispatch('close')}
+  role="dialog" aria-modal="true"
+>
+  <div
+    class="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden"
+    style="animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both;"
+  >
+    <div class="h-0.5 w-full" style="background:{event.color ?? '#6366f1'};"></div>
 
     <div class="p-5 flex flex-col gap-4">
-      <!-- Header row -->
+      <!-- Header -->
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
@@ -119,9 +125,10 @@
                 disabled={rsvpLoading}
                 class="h-8 rounded-lg border text-xs font-medium transition-all active:scale-95
                        flex items-center justify-center gap-1
-                       {myStatus === btn.status ? btn.cls : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground'}"
+                       {myStatus === btn.status ? btn.active : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground'}"
               >
-                <span>{btn.icon}</span> {btn.label}
+                <svelte:component this={btn.icon} class="w-3 h-3" />
+                {btn.label}
               </button>
             {/each}
           </div>
@@ -148,7 +155,7 @@
             {#each members as m}
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <div class="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold uppercase">
+                  <div class="w-5 h-5 rounded-full bg-muted border border-border flex items-center justify-center text-[10px] font-bold uppercase">
                     {m.username?.[0] ?? '?'}
                   </div>
                   <span class="text-sm">{m.username ?? 'Unknown'}</span>
@@ -164,3 +171,10 @@
     </div>
   </div>
 </div>
+
+<style>
+  @keyframes modal-in {
+    from { opacity: 0; transform: scale(0.94) translateY(8px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0);   }
+  }
+</style>

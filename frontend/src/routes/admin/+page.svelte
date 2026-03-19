@@ -6,7 +6,7 @@
   import type { User, Event } from '$lib/types';
   import {
     ArrowLeft, Shield, Users, CalendarDays, Plus, Pencil,
-    Trash2, Search, X, Eye, EyeOff, Bell, BarChart2, Hash
+    Trash2, Search, X, Eye, EyeOff, Bell, BarChart2, Hash, AlertTriangle, Lock
   } from 'lucide-svelte';
 
   type Tab = 'users' | 'events' | 'discord' | 'stats';
@@ -17,13 +17,11 @@
   let usersLoading = true, eventsLoading = true;
   let userSearch = '', eventSearch = '';
 
-  // User dialog
   let userDialogOpen = false;
   let editingUser: User | null = null;
   let userForm = { username: '', email: '', password: '', perms: 0 };
   let showPw = false, userSaving = false, userError = '';
 
-  // Delete
   let deleteTarget: { type: 'user' | 'event'; id: string | number; name: string } | null = null;
   let deleteLoading = false;
 
@@ -35,16 +33,8 @@
   async function fetchUsers()  { usersLoading  = true; try { users  = await apiFetch<User[]>('/api/admin/users');  } finally { usersLoading  = false; } }
   async function fetchEvents() { eventsLoading = true; try { events = await apiFetch<Event[]>('/api/admin/events'); } finally { eventsLoading = false; } }
 
-  function openCreateUser() {
-    editingUser = null;
-    userForm = { username: '', email: '', password: '', perms: 0 };
-    userError = ''; showPw = false; userDialogOpen = true;
-  }
-  function openEditUser(u: User) {
-    editingUser = u;
-    userForm = { username: u.username, email: u.email, password: '', perms: u.perms };
-    userError = ''; showPw = false; userDialogOpen = true;
-  }
+  function openCreateUser() { editingUser = null; userForm = { username: '', email: '', password: '', perms: 0 }; userError = ''; showPw = false; userDialogOpen = true; }
+  function openEditUser(u: User) { editingUser = u; userForm = { username: u.username, email: u.email, password: '', perms: u.perms }; userError = ''; showPw = false; userDialogOpen = true; }
 
   async function saveUser() {
     userError = '';
@@ -80,24 +70,20 @@
 
   $: filteredUsers  = users.filter(u  => u.username.toLowerCase().includes(userSearch.toLowerCase())  || u.email.toLowerCase().includes(userSearch.toLowerCase()));
   $: filteredEvents = events.filter(e => e.title.toLowerCase().includes(eventSearch.toLowerCase()) || (e.creator_name ?? '').toLowerCase().includes(eventSearch.toLowerCase()));
-
-  // Stats derived
-  $: adminCount     = users.filter(u => u.perms >= 999).length;
-  $: upcomingCount  = events.filter(e => new Date(e.date) > new Date()).length;
-  $: privateCount   = events.filter(e => e.private).length;
+  $: adminCount    = users.filter(u => u.perms >= 999).length;
+  $: upcomingCount = events.filter(e => new Date(e.date) > new Date()).length;
+  $: privateCount  = events.filter(e => e.private).length;
 
   const INPUT = 'h-9 w-full rounded-lg border border-input bg-muted/20 px-3 text-sm outline-none focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20 transition placeholder:text-muted-foreground/50';
-
   const TABS: { id: Tab; label: string; icon: any }[] = [
-    { id: 'users',   label: 'Users',   icon: Users       },
-    { id: 'events',  label: 'Events',  icon: CalendarDays},
-    { id: 'stats',   label: 'Stats',   icon: BarChart2   },
-    { id: 'discord', label: 'Discord', icon: Hash        },
+    { id: 'users',   label: 'Users',   icon: Users        },
+    { id: 'events',  label: 'Events',  icon: CalendarDays },
+    { id: 'stats',   label: 'Stats',   icon: BarChart2    },
+    { id: 'discord', label: 'Discord', icon: Hash         },
   ];
 </script>
 
 <div class="min-h-screen bg-background text-foreground">
-  <!-- Header -->
   <header class="border-b border-border px-5 py-3 flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-md z-10">
     <div class="flex items-center gap-2">
       <a href="/calendar" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground">
@@ -110,14 +96,13 @@
   </header>
 
   <div class="max-w-3xl mx-auto px-5 py-6 flex flex-col gap-6">
-
-    <!-- Stat grid -->
+    <!-- Stats -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {#each [
-        { label: 'Total Users',   value: users.length,   color: '#3b82f6', icon: Users       },
-        { label: 'Total Events',  value: events.length,  color: '#a855f7', icon: CalendarDays},
-        { label: 'Upcoming',      value: upcomingCount,  color: '#22c55e', icon: Bell        },
-        { label: 'Private',       value: privateCount,   color: '#f97316', icon: Shield      },
+        { label: 'Total Users',  value: users.length,  color: '#3b82f6', icon: Users        },
+        { label: 'Total Events', value: events.length, color: '#a855f7', icon: CalendarDays },
+        { label: 'Upcoming',     value: upcomingCount, color: '#22c55e', icon: Bell         },
+        { label: 'Private',      value: privateCount,  color: '#f97316', icon: Lock         },
       ] as stat}
         <div class="bg-card border border-border rounded-2xl p-4 flex items-center gap-3 overflow-hidden relative">
           <div class="absolute inset-0 opacity-5 rounded-2xl" style="background:{stat.color};"></div>
@@ -146,7 +131,7 @@
       {/each}
     </div>
 
-    <!-- Users Tab -->
+    <!-- Users -->
     {#if tab === 'users'}
       <div class="bg-card border border-border rounded-2xl overflow-hidden">
         <div class="p-5 border-b border-border flex flex-col gap-3">
@@ -181,8 +166,8 @@
           {:else}
             {#each filteredUsers as u}
               <div class="flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition group">
-                <div class="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-xs font-bold uppercase shrink-0"
-                  style="background: hsl({((u.username.charCodeAt(0) * 47) % 360)}, 40%, 25%); color: hsl({((u.username.charCodeAt(0) * 47) % 360)}, 70%, 70%);">
+                <div class="w-8 h-8 rounded-full border border-border flex items-center justify-center text-xs font-bold uppercase shrink-0"
+                  style="background:hsl({((u.username.charCodeAt(0)*47)%360)},40%,25%); color:hsl({((u.username.charCodeAt(0)*47)%360)},70%,70%);">
                   {u.username[0]}
                 </div>
                 <div class="flex-1 min-w-0">
@@ -213,7 +198,7 @@
       </div>
     {/if}
 
-    <!-- Events Tab -->
+    <!-- Events -->
     {#if tab === 'events'}
       <div class="bg-card border border-border rounded-2xl overflow-hidden">
         <div class="p-5 border-b border-border flex flex-col gap-3">
@@ -247,7 +232,7 @@
                 <div class="flex-1 min-w-0">
                   <div class="text-sm font-medium truncate flex items-center gap-1.5">
                     {e.title}
-                    {#if e.private}<span class="text-[10px] opacity-70">🔒</span>{/if}
+                    {#if e.private}<Lock class="w-3 h-3 text-muted-foreground shrink-0" />{/if}
                     {#if isPast}<span class="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">Past</span>{/if}
                   </div>
                   <div class="text-xs text-muted-foreground">
@@ -267,23 +252,23 @@
       </div>
     {/if}
 
-    <!-- Stats Tab -->
+    <!-- Stats -->
     {#if tab === 'stats'}
       <div class="flex flex-col gap-4">
         <div class="bg-card border border-border rounded-2xl p-5">
           <h2 class="font-semibold text-sm mb-4">User breakdown</h2>
-          <div class="flex flex-col gap-2">
+          <div class="flex flex-col gap-3">
             {#each [
               { label: 'Regular users', value: users.length - adminCount, total: users.length, color: '#3b82f6' },
               { label: 'Admins',        value: adminCount,                total: users.length, color: '#eab308' },
             ] as row}
-              <div class="flex flex-col gap-1">
+              <div class="flex flex-col gap-1.5">
                 <div class="flex items-center justify-between text-xs">
                   <span class="text-muted-foreground">{row.label}</span>
                   <span class="font-medium tabular-nums">{row.value}</span>
                 </div>
                 <div class="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div class="h-full rounded-full transition-all" style="width:{row.total ? (row.value/row.total*100).toFixed(1) : 0}%; background:{row.color};"></div>
+                  <div class="h-full rounded-full transition-all duration-500" style="width:{row.total ? (row.value/row.total*100).toFixed(1) : 0}%; background:{row.color};"></div>
                 </div>
               </div>
             {/each}
@@ -291,19 +276,19 @@
         </div>
         <div class="bg-card border border-border rounded-2xl p-5">
           <h2 class="font-semibold text-sm mb-4">Event breakdown</h2>
-          <div class="flex flex-col gap-2">
+          <div class="flex flex-col gap-3">
             {#each [
-              { label: 'Upcoming events', value: upcomingCount,                         total: events.length, color: '#22c55e' },
-              { label: 'Past events',     value: events.length - upcomingCount,          total: events.length, color: '#6366f1' },
-              { label: 'Private events',  value: privateCount,                          total: events.length, color: '#f97316' },
+              { label: 'Upcoming', value: upcomingCount,               total: events.length, color: '#22c55e' },
+              { label: 'Past',     value: events.length - upcomingCount, total: events.length, color: '#6366f1' },
+              { label: 'Private',  value: privateCount,                total: events.length, color: '#f97316' },
             ] as row}
-              <div class="flex flex-col gap-1">
+              <div class="flex flex-col gap-1.5">
                 <div class="flex items-center justify-between text-xs">
                   <span class="text-muted-foreground">{row.label}</span>
                   <span class="font-medium tabular-nums">{row.value}</span>
                 </div>
                 <div class="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div class="h-full rounded-full transition-all" style="width:{row.total ? (row.value/row.total*100).toFixed(1) : 0}%; background:{row.color};"></div>
+                  <div class="h-full rounded-full transition-all duration-500" style="width:{row.total ? (row.value/row.total*100).toFixed(1) : 0}%; background:{row.color};"></div>
                 </div>
               </div>
             {/each}
@@ -312,9 +297,9 @@
       </div>
     {/if}
 
-    <!-- Discord Tab -->
+    <!-- Discord -->
     {#if tab === 'discord'}
-      <div class="bg-card border border-border rounded-2xl p-6 flex flex-col items-center gap-4 text-center">
+      <div class="bg-card border border-border rounded-2xl p-8 flex flex-col items-center gap-4 text-center">
         <div class="w-14 h-14 rounded-2xl bg-[#5865f2]/10 border border-[#5865f2]/20 flex items-center justify-center">
           <Hash class="w-6 h-6 text-[#5865f2]" />
         </div>
@@ -322,13 +307,12 @@
           <h2 class="font-semibold">Discord Integration</h2>
           <p class="text-sm text-muted-foreground mt-1 max-w-xs">Discord bot settings and notifications will appear here once configured.</p>
         </div>
-        <div class="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 border border-border px-4 py-2.5 rounded-xl">
-          <span class="w-2 h-2 rounded-full bg-muted-foreground/50"></span>
+        <div class="inline-flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 border border-border px-4 py-2 rounded-xl">
+          <div class="w-2 h-2 rounded-full bg-muted-foreground/40"></div>
           Not configured
         </div>
       </div>
     {/if}
-
   </div>
 </div>
 
@@ -379,7 +363,7 @@
         </div>
         {#if userError}
           <div class="flex items-center gap-2 px-3 py-2.5 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl">
-            <span>⚠</span> {userError}
+            <AlertTriangle class="w-4 h-4 shrink-0 text-red-400" /> {userError}
           </div>
         {/if}
       </div>
@@ -403,12 +387,12 @@
       style="animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both;">
       <div class="flex items-start gap-3">
         <div class="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
-          <Trash2 class="w-4 h-4 text-red-400" />
+          <AlertTriangle class="w-4 h-4 text-red-400" />
         </div>
         <div>
-          <h2 class="font-semibold">Delete {deleteTarget.type === 'user' ? 'user' : 'event'}?</h2>
+          <h2 class="font-semibold">Delete {deleteTarget.type}?</h2>
           <p class="text-sm text-muted-foreground mt-1">
-            <span class="text-foreground font-medium">{deleteTarget.name}</span> will be permanently deleted. This cannot be undone.
+            <span class="text-foreground font-medium">{deleteTarget.name}</span> will be permanently deleted.
           </p>
         </div>
       </div>
