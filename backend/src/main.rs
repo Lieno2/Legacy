@@ -4,6 +4,7 @@ mod error;
 mod models;
 mod routes;
 mod auth;
+mod setup;
 
 use axum::{
     Router,
@@ -109,6 +110,9 @@ async fn main() {
 
     let pg_pool = db::create_pg_pool(&cfg.database_url).await;
     let redis_client = db::create_redis_client(&cfg.redis_url);
+
+    // Run setup account seeding
+    setup::run_setup(&pg_pool, &cfg).await;
 
     let cors = CorsLayer::new()
         .allow_origin(cfg.frontend_url.parse::<HeaderValue>().unwrap())

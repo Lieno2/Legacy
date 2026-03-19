@@ -6,6 +6,9 @@ pub struct Config {
     pub access_token_expiry_secs: u64,
     pub refresh_token_expiry_secs: u64,
     pub frontend_url: String,
+    pub setup_account_enabled: bool,
+    pub setup_account_email: String,
+    pub setup_account_password: String,
 }
 
 impl Config {
@@ -23,6 +26,13 @@ impl Config {
                 .parse()
                 .unwrap_or(604800),
             frontend_url: std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string()),
+            setup_account_enabled: std::env::var("SETUP_ACCOUNT_ENABLED")
+                .unwrap_or_else(|_| "false".to_string())
+                .to_lowercase() == "true",
+            setup_account_email: std::env::var("SETUP_ACCOUNT_EMAIL")
+                .unwrap_or_else(|_| "admin@legacy.local".to_string()),
+            setup_account_password: std::env::var("SETUP_ACCOUNT_PASSWORD")
+                .unwrap_or_else(|_| "admin123".to_string()),
         }
     }
 }
