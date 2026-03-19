@@ -55,7 +55,6 @@
     if (!validate()) return;
     saving = true;
     try {
-      // Append Z so chrono parses it as UTC (backend expects DateTime<Utc>)
       const iso = `${dateVal}T${timeVal}:00Z`;
       const body = {
         title:       title.trim(),
@@ -97,10 +96,8 @@
     class="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden"
     style="animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both;"
   >
-    <!-- Gradient accent bar using selected color -->
     <div class="h-0.5 w-full" style="background: linear-gradient(90deg, {color}, {color}55);"></div>
 
-    <!-- Header -->
     <div class="flex items-center gap-2.5 px-5 py-4 border-b border-border">
       <div class="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
         style="background:{color}20; border:1px solid {color}40;">
@@ -196,21 +193,24 @@
       <div class="flex items-end justify-between gap-4 pt-1 border-t border-border">
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Color</label>
-          <div class="flex items-center gap-1.5 flex-wrap">
+          <!-- padding gives room for the scale(1.25) selected swatch without clipping -->
+          <div class="flex items-center gap-2 py-1 px-0.5">
             {#each COLORS as c}
               <button
                 type="button"
                 on:click={() => (color = c.hex)}
                 title={c.name}
-                class="w-5 h-5 rounded-full transition-all duration-150
-                       {color === c.hex ? 'scale-125 ring-2 ring-offset-2 ring-offset-card' : 'opacity-50 hover:opacity-100 hover:scale-110'}"
+                class="w-4 h-4 rounded-full transition-all duration-150 shrink-0
+                       {color === c.hex
+                         ? 'scale-125 ring-2 ring-offset-2 ring-offset-card'
+                         : 'opacity-50 hover:opacity-100 hover:scale-110'}"
                 style="background:{c.hex}; --tw-ring-color:{c.hex};"
               ></button>
             {/each}
           </div>
         </div>
 
-        <label class="flex items-center gap-2 cursor-pointer select-none shrink-0 pb-0.5">
+        <label class="flex items-center gap-2 cursor-pointer select-none shrink-0 pb-1">
           <span class="text-sm text-muted-foreground flex items-center gap-1.5">
             <Lock class="w-3.5 h-3.5" /> Private
           </span>
