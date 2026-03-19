@@ -20,30 +20,27 @@ pub struct RsvpRequest {
     pub late_minutes: Option<i32>,
 }
 
-// GET /api/rsvp?event_id=X
 pub async fn list(
-    auth: AuthUser,
+    _auth: AuthUser,
     State(state): State<AppState>,
     Query(q): Query<EventIdQuery>,
 ) -> Result<Json<Vec<EventMember>>> {
-    let members = sqlx::query_as!(
-        EventMember,
+    let members = sqlx::query_as::<_, EventMember>(
         r#"
         SELECT em."eventId" AS event_id, em."userId" AS user_id,
                u.username, em.status, em."lateMinutes" AS late_minutes, em."joinedAt" AS joined_at
         FROM "EventMembers" em
         LEFT JOIN "Users" u ON em."userId" = u.id
         WHERE em."eventId" = $1
-        "#,
-        q.event_id
+        "#
     )
+    .bind(q.event_id)
     .fetch_all(&state.db)
     .await?;
 
     Ok(Json(members))
 }
 
-// POST /api/rsvp — upsert
 pub async fn upsert(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -53,8 +50,8 @@ pub async fn upsert(
         return Err(AppError::BadRequest("Invalid status".into()));
     }
 
-    // Verify event exists
-    let exists = sqlx::query!(r#"SELECT id FROM "Events" WHERE id = $1"#, body.event_id)
+    let exists = sqlx::query(r#"SELECT id FROM "Events" WHERE id = $1"#)
+        .bind(body.event_id)
         .fetch_optional(&state.db)
         .await?
         .is_some();
@@ -64,35 +61,34 @@ pub async fn upsert(
 
     let late_minutes = if body.status == "late" { body.late_minutes } else { None };
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO "EventMembers" ("eventId", "userId", status, "lateMinutes")
         VALUES ($1, $2, $3, $4)
         ON CONFLICT ("eventId", "userId") DO UPDATE
             SET status = EXCLUDED.status, "lateMinutes" = EXCLUDED."lateMinutes"
-        "#,
-        body.event_id,
-        auth.0.sub,
-        body.status,
-        late_minutes,
+        "#
     )
+    .bind(body.event_id)
+    .bind(&auth.0.sub)
+    .bind(&body.status)
+    .bind(late_minutes)
     .execute(&state.db)
     .await?;
 
     Ok(Json(serde_json::json!({ "success": true })))
 }
 
-// DELETE /api/rsvp?event_id=X
 pub async fn remove(
     auth: AuthUser,
     State(state): State<AppState>,
     Query(q): Query<EventIdQuery>,
 ) -> Result<Json<serde_json::Value>> {
-    sqlx::query!(
-        r#"DELETE FROM "EventMembers" WHERE "eventId" = $1 AND "userId" = $2"#,
-        q.event_id,
-        auth.0.sub,
+    sqlx::query(
+        r#"DELETE FROM "EventMembers" WHERE "eventId" = $1 AND "userId" = $2"#
     )
+    .bind(q.event_id)
+    .bind(&auth.0.sub)
     .execute(&state.db)
     .await?;
 

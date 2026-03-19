@@ -16,16 +16,19 @@ pub struct UpdateProfileRequest {
     pub new_password: Option<String>,
 }
 
-// GET /api/account
+#[derive(sqlx::FromRow)]
+struct PasswordRow {
+    password_hash: String,
+}
+
 pub async fn get_profile(
     auth: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Json<UserPublic>> {
-    let user = sqlx::query_as!(
-        UserPublic,
-        r#"SELECT id, username, email, perms, "createdAt" AS created_at FROM "Users" WHERE id = $1"#,
-        auth.0.sub
+    let user = sqlx::query_as::<_, UserPublic>(
+        r#"SELECT id, username, email, perms, "createdAt" AS created_at FROM "Users" WHERE id = $1"#
     )
+    .bind(&auth.0.sub)
     .fetch_optional(&state.db)
     .await?
     .ok_or(AppError::NotFound)?;
@@ -33,7 +36,6 @@ pub async fn get_profile(
     Ok(Json(user))
 }
 
-// PUT /api/account
 pub async fn update_profile(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -46,27 +48,26 @@ pub async fn update_profile(
         return Err(AppError::BadRequest("Username and email are required".into()));
     }
 
-    // Check username conflict
-    let taken = sqlx::query!(
-        r#"SELECT id FROM "Users" WHERE username = $1 AND id != $2"#,
-        username, auth.0.sub
+    let taken = sqlx::query(
+        r#"SELECT id FROM "Users" WHERE username = $1 AND id != $2"#
     )
+    .bind(&username)
+    .bind(&auth.0.sub)
     .fetch_optional(&state.db)
     .await?
     .is_some();
     if taken { return Err(AppError::Conflict("Username already taken".into())); }
 
-    // Check email conflict
-    let email_taken = sqlx::query!(
-        r#"SELECT id FROM "Users" WHERE email = $1 AND id != $2"#,
-        email, auth.0.sub
+    let email_taken = sqlx::query(
+        r#"SELECT id FROM "Users" WHERE email = $1 AND id != $2"#
     )
+    .bind(&email)
+    .bind(&auth.0.sub)
     .fetch_optional(&state.db)
     .await?
     .is_some();
     if email_taken { return Err(AppError::Conflict("Email already in use".into())); }
 
-    // Handle password change
     let new_hash: Option<String> = if let Some(new_pw) = &body.new_password {
         let current_pw = body.current_password.as_deref()
             .ok_or_else(|| AppError::BadRequest("Current password required".into()))?;
@@ -75,14 +76,14 @@ pub async fn update_profile(
             return Err(AppError::BadRequest("Password must be at least 8 characters".into()));
         }
 
-        let user = sqlx::query!(
-            r#"SELECT "passwordHash" AS password_hash FROM "Users" WHERE id = $1"#,
-            auth.0.sub
+        let row = sqlx::query_as::<_, PasswordRow>(
+            r#"SELECT "passwordHash" AS password_hash FROM "Users" WHERE id = $1"#
         )
+        .bind(&auth.0.sub)
         .fetch_one(&state.db)
         .await?;
 
-        let valid = bcrypt::verify(current_pw, &user.password_hash)
+        let valid = bcrypt::verify(current_pw, &row.password_hash)
             .map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
         if !valid {
             return Err(AppError::BadRequest("Current password is incorrect".into()));
@@ -94,25 +95,27 @@ pub async fn update_profile(
         None
     };
 
-    // Update user
     let updated = if let Some(hash) = new_hash {
-        sqlx::query_as!(
-            UserPublic,
+        sqlx::query_as::<_, UserPublic>(
             r#"UPDATE "Users" SET username = $1, email = $2, "passwordHash" = $3
                WHERE id = $4
-               RETURNING id, username, email, perms, "createdAt" AS created_at"#,
-            username, email, hash, auth.0.sub
+               RETURNING id, username, email, perms, "createdAt" AS created_at"#
         )
+        .bind(&username)
+        .bind(&email)
+        .bind(&hash)
+        .bind(&auth.0.sub)
         .fetch_one(&state.db)
         .await?
     } else {
-        sqlx::query_as!(
-            UserPublic,
+        sqlx::query_as::<_, UserPublic>(
             r#"UPDATE "Users" SET username = $1, email = $2
                WHERE id = $3
-               RETURNING id, username, email, perms, "createdAt" AS created_at"#,
-            username, email, auth.0.sub
+               RETURNING id, username, email, perms, "createdAt" AS created_at"#
         )
+        .bind(&username)
+        .bind(&email)
+        .bind(&auth.0.sub)
         .fetch_one(&state.db)
         .await?
     };

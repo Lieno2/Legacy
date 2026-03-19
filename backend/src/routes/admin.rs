@@ -35,13 +35,11 @@ pub struct UpdateUserRequest {
     pub new_password: Option<String>,
 }
 
-// GET /api/admin/users
 pub async fn list_users(
     _admin: AdminUser,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserPublic>>> {
-    let users = sqlx::query_as!(
-        UserPublic,
+    let users = sqlx::query_as::<_, UserPublic>(
         r#"SELECT id, username, email, perms, "createdAt" AS created_at FROM "Users" ORDER BY "createdAt" ASC"#
     )
     .fetch_all(&state.db)
@@ -50,7 +48,6 @@ pub async fn list_users(
     Ok(Json(users))
 }
 
-// POST /api/admin/users
 pub async fn create_user(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -66,7 +63,8 @@ pub async fn create_user(
         return Err(AppError::BadRequest("Password must be at least 8 characters".into()));
     }
 
-    let exists = sqlx::query!(r#"SELECT id FROM "Users" WHERE email = $1"#, email)
+    let exists = sqlx::query(r#"SELECT id FROM "Users" WHERE email = $1"#)
+        .bind(&email)
         .fetch_optional(&state.db)
         .await?
         .is_some();
@@ -77,20 +75,22 @@ pub async fn create_user(
     let new_id = uuid::Uuid::new_v4().to_string();
     let perms = body.perms.unwrap_or(0);
 
-    let user = sqlx::query_as!(
-        UserPublic,
+    let user = sqlx::query_as::<_, UserPublic>(
         r#"INSERT INTO "Users" (id, username, email, "passwordHash", perms)
            VALUES ($1, $2, $3, $4, $5)
-           RETURNING id, username, email, perms, "createdAt" AS created_at"#,
-        new_id, username, email, hash, perms
+           RETURNING id, username, email, perms, "createdAt" AS created_at"#
     )
+    .bind(&new_id)
+    .bind(&username)
+    .bind(&email)
+    .bind(&hash)
+    .bind(perms)
     .fetch_one(&state.db)
     .await?;
 
     Ok(Json(user))
 }
 
-// PUT /api/admin/users
 pub async fn update_user(
     _admin: AdminUser,
     State(state): State<AppState>,
@@ -110,24 +110,29 @@ pub async fn update_user(
         }
         let hash = bcrypt::hash(new_pw, bcrypt::DEFAULT_COST)
             .map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
-        sqlx::query_as!(
-            UserPublic,
+        sqlx::query_as::<_, UserPublic>(
             r#"UPDATE "Users" SET username = $1, email = $2, perms = $3, "passwordHash" = $4
                WHERE id = $5
-               RETURNING id, username, email, perms, "createdAt" AS created_at"#,
-            username, email, perms, hash, body.id
+               RETURNING id, username, email, perms, "createdAt" AS created_at"#
         )
+        .bind(&username)
+        .bind(&email)
+        .bind(perms)
+        .bind(&hash)
+        .bind(&body.id)
         .fetch_optional(&state.db)
         .await?
         .ok_or(AppError::NotFound)?
     } else {
-        sqlx::query_as!(
-            UserPublic,
+        sqlx::query_as::<_, UserPublic>(
             r#"UPDATE "Users" SET username = $1, email = $2, perms = $3
                WHERE id = $4
-               RETURNING id, username, email, perms, "createdAt" AS created_at"#,
-            username, email, perms, body.id
+               RETURNING id, username, email, perms, "createdAt" AS created_at"#
         )
+        .bind(&username)
+        .bind(&email)
+        .bind(perms)
+        .bind(&body.id)
         .fetch_optional(&state.db)
         .await?
         .ok_or(AppError::NotFound)?
@@ -136,7 +141,6 @@ pub async fn update_user(
     Ok(Json(updated))
 }
 
-// DELETE /api/admin/users?id=X
 pub async fn delete_user(
     admin: AdminUser,
     State(state): State<AppState>,
@@ -146,10 +150,10 @@ pub async fn delete_user(
         return Err(AppError::BadRequest("Cannot delete your own account".into()));
     }
 
-    let deleted = sqlx::query!(
-        r#"DELETE FROM "Users" WHERE id = $1 RETURNING id"#,
-        q.id
+    let deleted = sqlx::query(
+        r#"DELETE FROM "Users" WHERE id = $1 RETURNING id"#
     )
+    .bind(&q.id)
     .fetch_optional(&state.db)
     .await?
     .is_some();
@@ -158,13 +162,11 @@ pub async fn delete_user(
     Ok(Json(serde_json::json!({ "success": true })))
 }
 
-// GET /api/admin/events
 pub async fn list_events(
     _admin: AdminUser,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<EventWithCreator>>> {
-    let events = sqlx::query_as!(
-        EventWithCreator,
+    let events = sqlx::query_as::<_, EventWithCreator>(
         r#"
         SELECT e.id, e.title, e.description, e.date, e.location, e.color,
                e."createdBy" AS created_by, e."createdAt" AS created_at,
@@ -180,16 +182,15 @@ pub async fn list_events(
     Ok(Json(events))
 }
 
-// DELETE /api/admin/events?id=X
 pub async fn delete_event(
     _admin: AdminUser,
     State(state): State<AppState>,
     Query(q): Query<EventIdQuery>,
 ) -> Result<Json<serde_json::Value>> {
-    let deleted = sqlx::query!(
-        r#"DELETE FROM "Events" WHERE id = $1 RETURNING id"#,
-        q.id
+    let deleted = sqlx::query(
+        r#"DELETE FROM "Events" WHERE id = $1 RETURNING id"#
     )
+    .bind(q.id)
     .fetch_optional(&state.db)
     .await?
     .is_some();

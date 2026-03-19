@@ -1,5 +1,6 @@
-use axum::{extract::{Path, Query, State}, Json};
-use serde::{Deserialize, Serialize};
+use axum::extract::{Path, State};
+use axum::Json;
+use serde::Deserialize;
 use chrono::{DateTime, Utc};
 
 use crate::{
@@ -29,13 +30,11 @@ pub struct UpdateEventRequest {
     pub private: Option<bool>,
 }
 
-// GET /api/events — returns events created by or RSVPed to by the current user
 pub async fn list(
     auth: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<EventWithCreator>>> {
-    let events = sqlx::query_as!(
-        EventWithCreator,
+    let events = sqlx::query_as::<_, EventWithCreator>(
         r#"
         SELECT e.id, e.title, e.description, e.date, e.location, e.color,
                e."createdBy" AS created_by, e."createdAt" AS created_at,
@@ -55,16 +54,15 @@ pub async fn list(
         WHERE em."userId" = $1 AND e.private = false
 
         ORDER BY date ASC
-        "#,
-        auth.0.sub
+        "#
     )
+    .bind(&auth.0.sub)
     .fetch_all(&state.db)
     .await?;
 
     Ok(Json(events))
 }
 
-// POST /api/events
 pub async fn create(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -74,8 +72,7 @@ pub async fn create(
         return Err(AppError::BadRequest("Title is required".into()));
     }
 
-    let event = sqlx::query_as!(
-        EventWithCreator,
+    let event = sqlx::query_as::<_, EventWithCreator>(
         r#"
         WITH inserted AS (
             INSERT INTO "Events" (title, description, date, location, color, "createdBy", private)
@@ -87,22 +84,21 @@ pub async fn create(
                i.private, u.username AS creator_name
         FROM inserted i
         LEFT JOIN "Users" u ON i."createdBy" = u.id
-        "#,
-        body.title.trim(),
-        body.description,
-        body.date,
-        body.location,
-        body.color,
-        auth.0.sub,
-        body.private.unwrap_or(false),
+        "#
     )
+    .bind(body.title.trim())
+    .bind(&body.description)
+    .bind(body.date)
+    .bind(&body.location)
+    .bind(&body.color)
+    .bind(&auth.0.sub)
+    .bind(body.private.unwrap_or(false))
     .fetch_one(&state.db)
     .await?;
 
     Ok(Json(event))
 }
 
-// PUT /api/events/:id
 pub async fn update(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -113,8 +109,7 @@ pub async fn update(
         return Err(AppError::BadRequest("Title is required".into()));
     }
 
-    let event = sqlx::query_as!(
-        EventWithCreator,
+    let event = sqlx::query_as::<_, EventWithCreator>(
         r#"
         WITH updated AS (
             UPDATE "Events"
@@ -127,16 +122,16 @@ pub async fn update(
                u.private, usr.username AS creator_name
         FROM updated u
         LEFT JOIN "Users" usr ON u."createdBy" = usr.id
-        "#,
-        body.title.trim(),
-        body.description,
-        body.date,
-        body.location,
-        body.color,
-        body.private.unwrap_or(false),
-        id,
-        auth.0.sub,
+        "#
     )
+    .bind(body.title.trim())
+    .bind(&body.description)
+    .bind(body.date)
+    .bind(&body.location)
+    .bind(&body.color)
+    .bind(body.private.unwrap_or(false))
+    .bind(id)
+    .bind(&auth.0.sub)
     .fetch_optional(&state.db)
     .await?
     .ok_or(AppError::NotFound)?;
@@ -144,17 +139,16 @@ pub async fn update(
     Ok(Json(event))
 }
 
-// DELETE /api/events/:id
 pub async fn delete(
     auth: AuthUser,
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Json<serde_json::Value>> {
-    let deleted = sqlx::query!(
-        r#"DELETE FROM "Events" WHERE id = $1 AND "createdBy" = $2 RETURNING id"#,
-        id,
-        auth.0.sub,
+    let deleted = sqlx::query(
+        r#"DELETE FROM "Events" WHERE id = $1 AND "createdBy" = $2 RETURNING id"#
     )
+    .bind(id)
+    .bind(&auth.0.sub)
     .fetch_optional(&state.db)
     .await?;
 
