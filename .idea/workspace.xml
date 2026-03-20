@@ -1,25 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
     <list default="true" id="b601a6b7-ee11-4f98-b283-b522480c5cb3" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/models.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/models.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/routes/account.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/routes/account.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/routes/admin/users.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/routes/admin/users.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/routes/auth.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/routes/auth.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/routes/events.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/routes/events.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/src/routes/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/routes/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/routes/rsvp.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/routes/rsvp.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/setup.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/setup.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/app.html" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/lib/components/EventDetail.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/components/EventDetail.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/routes/polls.rs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/routes/polls.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/components/EventModal.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/components/EventModal.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/components/PollAnswerModal.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/components/PollAnswerModal.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/components/PollEditor.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/components/PollEditor.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/components/PollResults.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/components/PollResults.svelte" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/lib/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/types.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/routes/+layout.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/routes/+layout.svelte" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/routes/account/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/routes/account/+page.svelte" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/routes/calendar/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/routes/calendar/+page.svelte" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -27,20 +20,23 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="5454" />
+    <option name="cachedIndexableFilesCount" value="5458" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="eUHHLNIt" />
+  </component>
   <component name="McpProjectServerCommands">
     <commands />
     <urls />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "customColor": "",
-  "associatedIndex": 6
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 6
+}</component>
   <component name="ProjectId" id="3BCZhvU9jhJqwTkTNPR7rkrztTP" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -51,18 +47,29 @@
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "git-widget-placeholder": "main",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "bun",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.hideNoCargoProjectNotifications/home/lieno/IdeaProjects/Legacy/backend/Cargo.toml": "true",
     "settings.editor.selected.configurable": "preferences.pluginManager",
     "to.speed.mode.migration.done": "true",
+    "ts.external.directory.path": "/home/lieno/IdeaProjects/Legacy/frontend/node_modules/typescript/lib",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="/usr/bin" />
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -79,6 +86,7 @@
       <option name="presentableId" value="Default" />
       <updated>1773995135960</updated>
       <workItem from="1773995137794" duration="211000" />
+      <workItem from="1773995362409" duration="1373000" />
     </task>
     <servers />
   </component>

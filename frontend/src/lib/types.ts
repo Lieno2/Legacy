@@ -33,6 +33,8 @@ export interface EventMember {
 
 export type RsvpStatus = 'going' | 'late' | 'not_going';
 
+export type PollType = 'choice' | 'text' | 'rating' | 'yesno' | 'date';
+
 export interface PollChoice {
   id: number;
   label: string;
@@ -44,9 +46,14 @@ export interface Poll {
   id: number;
   event_id: number;
   question: string;
+  poll_type: PollType;
   allow_multiple: boolean;
   choices: PollChoice[];
   my_choice_ids: number[];
+  my_text_answer: string | null;
+  my_rating: number | null;
+  avg_rating: number | null;
+  rating_count: number;
 }
 
 export interface VoterEntry {
@@ -58,4 +65,21 @@ export interface ChoiceVoters {
   choice_id: number;
   label: string;
   voters: VoterEntry[];
+}
+
+export interface TextAnswer {
+  user_id: string;
+  username: string;
+  answer: string;
+}
+
+export interface PollTemplate {
+  id: number;
+  name: string;
+  poll_type: PollType;
+  question: string | null;
+  choices: { label: string }[] | null;
+  allow_multiple: boolean;
+  global: boolean;
+  created_by: string | null;
 }

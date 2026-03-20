@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { createEventDispatcher, tick } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
   import { apiFetch } from '$lib/api';
-  import type { Event, Poll } from '$lib/types';
+  import type { Event, Poll, PollType } from '$lib/types';
   import { X, MapPin, AlignLeft, Lock, Calendar, Clock, Edit3, Plus, AlertCircle, Search, UserMinus, Loader2 } from 'lucide-svelte';
   import PollEditor from './PollEditor.svelte';
 
@@ -44,8 +44,9 @@
   let fieldErrors: Record<string, string> = {};
 
   // ── Poll state ────────────────────────────────────────────────────────────
-  let pollEnabled      = false;
-  let pollQuestion     = '';
+  let pollEnabled       = false;
+  let pollQuestion      = '';
+  let pollType: PollType = 'choice';
   let pollChoices: string[] = ['', ''];
   let pollAllowMultiple = false;
 
@@ -57,6 +58,7 @@
       if (existing) {
         pollEnabled       = true;
         pollQuestion      = existing.question;
+        pollType          = existing.poll_type ?? 'choice';
         pollChoices       = existing.choices.map(c => c.label);
         pollAllowMultiple = existing.allow_multiple;
       }
@@ -89,7 +91,7 @@
       searchLoading = true;
       try {
         searchResults = await apiFetch<InviteUser[]>(
-          `/api/invites/search?q=${encodeURIComponent(searchQ)}&event_id=${savedEventId}`
+                `/api/invites/search?q=${encodeURIComponent(searchQ)}&event_id=${savedEventId}`
         );
       } catch { searchResults = []; }
       finally { searchLoading = false; }
@@ -119,8 +121,10 @@
   }
 
   $: headerDate = dateVal
-    ? new Date(dateVal + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })
-    : '';
+          ? new Date(dateVal + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })
+          : '';
+
+  function needsChoices(t: PollType) { return t === 'choice' || t === 'date'; }
 
   function validate(): boolean {
     fieldErrors = {};
@@ -128,7 +132,8 @@
     if (!dateVal)       fieldErrors.date  = 'Date is required';
     if (pollEnabled) {
       if (!pollQuestion.trim()) fieldErrors.poll = 'Poll question is required';
-      else if (pollChoices.filter(c => c.trim()).length < 2) fieldErrors.poll = 'At least 2 choices are required';
+      else if (needsChoices(pollType) && pollChoices.filter(c => c.trim()).length < 2)
+        fieldErrors.poll = 'At least 2 choices are required';
     }
     return Object.keys(fieldErrors).length === 0;
   }
@@ -152,7 +157,13 @@
       if (pollEnabled) {
         await apiFetch('/api/polls', {
           method: 'POST',
-          body: JSON.stringify({ event_id: savedId, question: pollQuestion.trim(), choices: pollChoices.filter(c => c.trim()), allow_multiple: pollAllowMultiple })
+          body: JSON.stringify({
+            event_id:      savedId,
+            question:      pollQuestion.trim(),
+            poll_type:     pollType,
+            choices:       needsChoices(pollType) ? pollChoices.filter(c => c.trim()) : [],
+            allow_multiple: pollAllowMultiple,
+          })
         });
       } else if (event?.id) {
         try { await apiFetch(`/api/polls?event_id=${event.id}`, { method: 'DELETE' }); } catch { }
@@ -181,23 +192,23 @@
 
 <!-- svelte-ignore a11y_interactive_supports_focus -->
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center p-4"
-  style="background:rgba(0,0,0,0.65); backdrop-filter:blur(4px);"
-  role="dialog"
-  aria-modal="true"
-  tabindex="-1"
-  on:click|self={() => dispatch('cancel')}
-  on:keydown={handleBackdropKey}
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style="background:rgba(0,0,0,0.65); backdrop-filter:blur(4px);"
+        role="dialog"
+        aria-modal="true"
+        tabindex="-1"
+        on:click|self={() => dispatch('cancel')}
+        on:keydown={handleBackdropKey}
 >
   <div
-    class="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden"
-    style="animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both;"
+          class="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden"
+          style="animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both;"
   >
     <div class="h-0.5 w-full" style="background: linear-gradient(90deg, {color}, {color}55);"></div>
 
     <div class="flex items-center gap-2.5 px-5 py-4 border-b border-border">
       <div class="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-        style="background:{color}20; border:1px solid {color}40;">
+           style="background:{color}20; border:1px solid {color}40;">
         {#if event}<Edit3 class="w-3.5 h-3.5" style="color:{color};" />
         {:else}<Plus class="w-3.5 h-3.5" style="color:{color};" />
         {/if}
@@ -206,7 +217,7 @@
         {event ? 'Edit event' : 'New event'}{#if headerDate}<span class="text-muted-foreground font-normal"> — {headerDate}</span>{/if}
       </h2>
       <button on:click={() => dispatch('cancel')} aria-label="Close"
-        class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
+              class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
         <X class="w-4 h-4" />
       </button>
     </div>
@@ -216,7 +227,7 @@
       <div class="flex flex-col gap-1.5">
         <label for="ev-title" class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
         <input id="ev-title" bind:value={title} placeholder="e.g. Team meeting" class={inputCls('title')}
-          on:input={() => { delete fieldErrors.title; fieldErrors = fieldErrors; }} />
+               on:input={() => { delete fieldErrors.title; fieldErrors = fieldErrors; }} />
         {#if fieldErrors.title}<p class="flex items-center gap-1 text-xs text-red-400"><AlertCircle class="w-3 h-3 shrink-0" /> {fieldErrors.title}</p>{/if}
       </div>
 
@@ -226,7 +237,7 @@
             <Calendar class="w-3 h-3" /> Date
           </label>
           <input id="ev-date" type="date" bind:value={dateVal} class={inputCls('date')}
-            on:change={() => { delete fieldErrors.date; fieldErrors = fieldErrors; }} />
+                 on:change={() => { delete fieldErrors.date; fieldErrors = fieldErrors; }} />
           {#if fieldErrors.date}<p class="flex items-center gap-1 text-xs text-red-400"><AlertCircle class="w-3 h-3 shrink-0" /> {fieldErrors.date}</p>{/if}
         </div>
         <div class="flex flex-col gap-1.5">
@@ -243,7 +254,7 @@
           <span class="normal-case font-normal text-muted-foreground/50 ml-0.5">(optional)</span>
         </label>
         <textarea id="ev-desc" bind:value={description} rows="3" placeholder="Add more details about this event..."
-          class="{BASE_INPUT} py-2 resize-none border-input"></textarea>
+                  class="{BASE_INPUT} py-2 resize-none border-input"></textarea>
       </div>
 
       <div class="flex flex-col gap-1.5">
@@ -260,9 +271,9 @@
           <div class="flex items-center gap-2 py-1 px-0.5">
             {#each COLORS as c}
               <button type="button" on:click={() => (color = c.hex)} title={c.name} aria-label={c.name}
-                class="w-4 h-4 rounded-full transition-all duration-150 shrink-0
+                      class="w-4 h-4 rounded-full transition-all duration-150 shrink-0
                        {color === c.hex ? 'scale-125 ring-2 ring-offset-2 ring-offset-card' : 'opacity-50 hover:opacity-100 hover:scale-110'}"
-                style="background:{c.hex}; --tw-ring-color:{c.hex};"
+                      style="background:{c.hex}; --tw-ring-color:{c.hex};"
               ></button>
             {/each}
           </div>
@@ -279,10 +290,11 @@
 
       <!-- Poll editor -->
       <PollEditor
-        bind:enabled={pollEnabled}
-        bind:question={pollQuestion}
-        bind:choices={pollChoices}
-        bind:allowMultiple={pollAllowMultiple}
+              bind:enabled={pollEnabled}
+              bind:question={pollQuestion}
+              bind:pollType={pollType}
+              bind:choices={pollChoices}
+              bind:allowMultiple={pollAllowMultiple}
       />
       {#if fieldErrors.poll}
         <p class="flex items-center gap-1 text-xs text-red-400 -mt-2">
@@ -300,16 +312,16 @@
           <div class="relative">
             <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
             <input bind:value={searchQ} on:input={onSearchInput} placeholder="Search by username or email..."
-              class="{BASE_INPUT} h-9 border-input pl-8" />
+                   class="{BASE_INPUT} h-9 border-input pl-8" />
             {#if searchLoading}<Loader2 class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground animate-spin" />{/if}
           </div>
           {#if searchResults.length > 0}
             <div class="flex flex-col gap-px rounded-xl border border-border bg-muted/30 overflow-hidden -mt-1">
               {#each searchResults as u}
                 <button type="button" on:click={() => addInvite(u)} disabled={inviteLoading[u.id]}
-                  class="flex items-center gap-3 px-3 py-2 hover:bg-muted transition text-left disabled:opacity-50">
+                        class="flex items-center gap-3 px-3 py-2 hover:bg-muted transition text-left disabled:opacity-50">
                   <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold uppercase shrink-0"
-                    style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);">{u.username[0]}</div>
+                       style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);">{u.username[0]}</div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium truncate">{u.username}</p>
                     <p class="text-xs text-muted-foreground truncate">{u.email}</p>
@@ -326,14 +338,14 @@
               {#each invited as u}
                 <div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-muted/20 border border-border">
                   <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold uppercase shrink-0"
-                    style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);">{u.username[0]}</div>
+                       style="background:hsl({(u.username.charCodeAt(0)*47)%360},40%,25%); color:hsl({(u.username.charCodeAt(0)*47)%360},70%,70%);">{u.username[0]}</div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium truncate">{u.username}</p>
                     <p class="text-xs text-muted-foreground truncate">{u.email}</p>
                   </div>
                   <button type="button" on:click={() => removeInvite(u)} disabled={inviteLoading[u.id]}
-                    aria-label="Remove {u.username}"
-                    class="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-40">
+                          aria-label="Remove {u.username}"
+                          class="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-40">
                     {#if inviteLoading[u.id]}<Loader2 class="w-3.5 h-3.5 animate-spin" />
                     {:else}<UserMinus class="w-3.5 h-3.5" />{/if}
                   </button>
@@ -360,11 +372,11 @@
 
       <div class="flex gap-2 pt-1">
         <button type="button" on:click={() => dispatch('cancel')}
-          class="flex-1 h-9 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition"
+                class="flex-1 h-9 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition"
         >Cancel</button>
         <button type="button" on:click={handleSubmit} disabled={saving}
-          class="flex-1 h-9 rounded-xl text-sm font-semibold transition active:scale-[0.97] disabled:opacity-50 text-white"
-          style="background:{color};"
+                class="flex-1 h-9 rounded-xl text-sm font-semibold transition active:scale-[0.97] disabled:opacity-50 text-white"
+                style="background:{color};"
         >{saving ? 'Saving…' : event ? 'Update event' : 'Create event'}</button>
       </div>
     </div>

@@ -26,7 +26,14 @@
   let poll: Poll | null = null;
   let pendingRsvpStatus: RsvpStatus | null = null;
   let pollAnswerSaving = false;
-  $: showPollModal = pendingRsvpStatus !== null && poll !== null && poll.my_choice_ids.length === 0;
+
+  // Show the poll modal if user hasn't answered yet (type-aware)
+  $: showPollModal = pendingRsvpStatus !== null && poll !== null && (() => {
+    if (!poll) return false;
+    if (poll.poll_type === 'text')   return !poll.my_text_answer;
+    if (poll.poll_type === 'rating') return poll.my_rating === null;
+    return poll.my_choice_ids.length === 0;
+  })();
 
   onMount(async () => {
     await Promise.all([loadMembers(), loadPoll()]);
@@ -54,7 +61,14 @@
   }
 
   async function rsvp(status: RsvpStatus) {
-    if (poll && poll.my_choice_ids.length === 0 && (status === 'going' || status === 'late')) {
+    // Check if poll needs to be answered first
+    const needsPollAnswer = poll && (status === 'going' || status === 'late') && (() => {
+      if (poll!.poll_type === 'text')   return !poll!.my_text_answer;
+      if (poll!.poll_type === 'rating') return poll!.my_rating === null;
+      return poll!.my_choice_ids.length === 0;
+    })();
+
+    if (needsPollAnswer) {
       pendingRsvpStatus = status;
       return;
     }
@@ -82,15 +96,26 @@
     }
   }
 
-  async function onPollConfirm(e: CustomEvent<{ choiceIds: number[] }>) {
+  async function onPollConfirm(e: CustomEvent<{ choiceIds?: number[]; textAnswer?: string; rating?: number }>) {
     if (!poll || !pendingRsvpStatus) return;
     pollAnswerSaving = true;
     try {
       await apiFetch('/api/polls/answer', {
         method: 'POST',
-        body: JSON.stringify({ poll_id: poll.id, choice_ids: e.detail.choiceIds })
+        body: JSON.stringify({
+          poll_id:     poll.id,
+          choice_ids:  e.detail.choiceIds,
+          text_answer: e.detail.textAnswer,
+          rating:      e.detail.rating,
+        })
       });
-      poll = { ...poll, my_choice_ids: e.detail.choiceIds };
+      // Update poll state locally
+      poll = {
+        ...poll,
+        my_choice_ids:  e.detail.choiceIds  ?? poll.my_choice_ids,
+        my_text_answer: e.detail.textAnswer  ?? poll.my_text_answer,
+        my_rating:      e.detail.rating      ?? poll.my_rating,
+      };
       await submitRsvp(pendingRsvpStatus);
       await loadPoll();
     } catch (err: unknown) {
@@ -148,27 +173,27 @@
 
 {#if showPollModal && poll}
   <PollAnswerModal
-    {poll}
-    {eventColor}
-    saving={pollAnswerSaving}
-    on:confirm={onPollConfirm}
-    on:skip={onPollSkip}
+          {poll}
+          {eventColor}
+          saving={pollAnswerSaving}
+          on:confirm={onPollConfirm}
+          on:skip={onPollSkip}
   />
 {/if}
 
 <!-- svelte-ignore a11y_interactive_supports_focus -->
 <div
-  class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-  style="background:rgba(0,0,0,0.65); backdrop-filter:blur(4px);"
-  role="dialog"
-  aria-modal="true"
-  tabindex="-1"
-  on:click|self={() => dispatch('close')}
-  on:keydown={handleBackdropKey}
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+        style="background:rgba(0,0,0,0.65); backdrop-filter:blur(4px);"
+        role="dialog"
+        aria-modal="true"
+        tabindex="-1"
+        on:click|self={() => dispatch('close')}
+        on:keydown={handleBackdropKey}
 >
   <div
-    class="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden"
-    style="animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both;"
+          class="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden"
+          style="animation: modal-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both;"
   >
     <div class="h-0.5 w-full" style="background:{eventColor};"></div>
 
@@ -187,16 +212,13 @@
           <p class="text-xs text-muted-foreground mt-0.5">by {event.creator_name ?? 'Unknown'}</p>
         </div>
         <div class="flex items-center gap-0.5 shrink-0">
-          <!-- Share button — only for public events with a token -->
           {#if canShare}
             <button
-              on:click={copyShareLink}
-              aria-label="Copy share link"
-              title={linkCopied ? 'Link copied!' : 'Copy share link'}
-              class="w-7 h-7 rounded-lg flex items-center justify-center transition
-                     {linkCopied
-                       ? 'text-emerald-400 bg-emerald-500/10'
-                       : 'hover:bg-muted text-muted-foreground hover:text-foreground'}"
+                    on:click={copyShareLink}
+                    aria-label="Copy share link"
+                    title={linkCopied ? 'Link copied!' : 'Copy share link'}
+                    class="w-7 h-7 rounded-lg flex items-center justify-center transition
+                     {linkCopied ? 'text-emerald-400 bg-emerald-500/10' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}"
             >
               {#if linkCopied}
                 <CheckCheck class="w-3.5 h-3.5" />
@@ -207,16 +229,16 @@
           {/if}
           {#if isOwner}
             <button on:click={() => dispatch('edit')} aria-label="Edit event"
-              class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
+                    class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
               <Pencil class="w-3.5 h-3.5" />
             </button>
             <button on:click={() => dispatch('delete')} aria-label="Delete event"
-              class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-500/10 transition text-muted-foreground hover:text-red-400">
+                    class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-500/10 transition text-muted-foreground hover:text-red-400">
               <Trash2 class="w-3.5 h-3.5" />
             </button>
           {/if}
           <button on:click={() => dispatch('close')} aria-label="Close"
-            class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
+                  class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
             <X class="w-4 h-4" />
           </button>
         </div>
@@ -233,10 +255,10 @@
             <MapPin class="w-3.5 h-3.5 shrink-0" />
             <span class="flex-1">{event.location}</span>
             <a
-              href={event.location.startsWith('http') ? event.location : `https://maps.google.com/?q=${encodeURIComponent(event.location)}`}
-              target="_blank" rel="noopener noreferrer"
-              class="text-xs underline underline-offset-3 hover:no-underline shrink-0"
-              style="color:{eventColor};"
+                    href={event.location.startsWith('http') ? event.location : `https://maps.google.com/?q=${encodeURIComponent(event.location)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    class="text-xs underline underline-offset-3 hover:no-underline shrink-0"
+                    style="color:{eventColor};"
             >Maps</a>
           </div>
         {/if}
@@ -252,10 +274,10 @@
         <div class="grid grid-cols-3 gap-1.5">
           {#each RSVP_BTNS as btn}
             <button
-              on:click={() => rsvp(btn.status)}
-              disabled={rsvpLoading}
-              aria-pressed={myStatus === btn.status}
-              class="h-8 rounded-lg border text-xs font-medium transition-all active:scale-95
+                    on:click={() => rsvp(btn.status)}
+                    disabled={rsvpLoading}
+                    aria-pressed={myStatus === btn.status}
+                    class="h-8 rounded-lg border text-xs font-medium transition-all active:scale-95
                      flex items-center justify-center gap-1
                      {myStatus === btn.status ? btn.active : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground'}
                      disabled:opacity-40 disabled:cursor-not-allowed"
@@ -282,25 +304,25 @@
             <span class="text-xs text-muted-foreground flex-1">Minutes late</span>
             <div class="flex items-center gap-1">
               <button type="button" on:click={() => clampMinutes(lateMinutes - 5)} disabled={lateMinutes <= 1}
-                aria-label="Decrease"
-                class="w-6 h-6 rounded-md flex items-center justify-center bg-muted hover:bg-muted/80
+                      aria-label="Decrease"
+                      class="w-6 h-6 rounded-md flex items-center justify-center bg-muted hover:bg-muted/80
                        text-muted-foreground hover:text-foreground transition active:scale-90 disabled:opacity-30"
               ><Minus class="w-3 h-3" /></button>
               <input type="number" min="1" max="120" value={lateMinutes}
-                on:change={onMinutesInput} on:blur={onMinutesInput}
-                class="w-10 text-center text-sm font-semibold tabular-nums text-amber-400
+                     on:change={onMinutesInput} on:blur={onMinutesInput}
+                     class="w-10 text-center text-sm font-semibold tabular-nums text-amber-400
                        bg-transparent border border-amber-500/25 rounded-md outline-none
                        focus:border-amber-400/60 transition
                        [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <button type="button" on:click={() => clampMinutes(lateMinutes + 5)} disabled={lateMinutes >= 120}
-                aria-label="Increase"
-                class="w-6 h-6 rounded-md flex items-center justify-center bg-muted hover:bg-muted/80
+                      aria-label="Increase"
+                      class="w-6 h-6 rounded-md flex items-center justify-center bg-muted hover:bg-muted/80
                        text-muted-foreground hover:text-foreground transition active:scale-90 disabled:opacity-30"
               ><Plus class="w-3 h-3" /></button>
             </div>
             <button on:click={() => submitRsvp('late')} disabled={rsvpLoading}
-              class="h-6 px-2.5 rounded-md bg-amber-500/15 border border-amber-500/25
+                    class="h-6 px-2.5 rounded-md bg-amber-500/15 border border-amber-500/25
                      text-xs font-medium text-amber-400 hover:bg-amber-500/25
                      transition active:scale-95 disabled:opacity-40 shrink-0"
             >{rsvpLoading ? '…' : 'Save'}</button>
