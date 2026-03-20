@@ -11,6 +11,8 @@ use crate::{
     routes::AppState,
 };
 
+use super::public_events::send_discord_notification;
+
 #[derive(Deserialize, ToSchema)]
 pub struct CreateEventRequest {
     pub title: String,
@@ -31,18 +33,11 @@ pub struct UpdateEventRequest {
     pub private: Option<bool>,
 }
 
-/// List events visible to the current user:
-/// - all public events
-/// - private events where user is the creator or an invited member
+/// List events visible to the current user
 #[utoipa::path(
-    get,
-    path = "/api/events",
-    tag = "Events",
+    get, path = "/api/events", tag = "Events",
     security(("bearer_auth" = [])),
-    responses(
-        (status = 200, description = "List of events", body = Vec<EventWithCreator>),
-        (status = 401, description = "Unauthorized"),
-    )
+    responses((status = 200, body = Vec<EventWithCreator>), (status = 401))
 )]
 pub async fn list(
     auth: AuthUser,
@@ -55,7 +50,8 @@ pub async fn list(
                e.location, e.color,
                e."createdBy" AS created_by,
                e."createdAt" AT TIME ZONE 'UTC' AS created_at,
-               e.private, u.username AS creator_name
+               e.private, u.username AS creator_name,
+               e.share_token
         FROM "Events" e
         LEFT JOIN "Users" u ON e."createdBy" = u.id
         WHERE
@@ -77,16 +73,9 @@ pub async fn list(
 
 /// Create a new event
 #[utoipa::path(
-    post,
-    path = "/api/events",
-    tag = "Events",
-    security(("bearer_auth" = [])),
-    request_body = CreateEventRequest,
-    responses(
-        (status = 200, description = "Created event", body = EventWithCreator),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized"),
-    )
+    post, path = "/api/events", tag = "Events",
+    security(("bearer_auth" = [])), request_body = CreateEventRequest,
+    responses((status = 200, body = EventWithCreator), (status = 400), (status = 401))
 )]
 pub async fn create(
     auth: AuthUser,
@@ -97,11 +86,13 @@ pub async fn create(
         return Err(AppError::BadRequest("Title is required".into()));
     }
 
+    let is_private = body.private.unwrap_or(false);
+
     let event = sqlx::query_as::<_, EventWithCreator>(
         r#"
         WITH inserted AS (
-            INSERT INTO "Events" (title, description, date, location, color, "createdBy", private)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO "Events" (title, description, date, location, color, "createdBy", private, share_token)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, gen_random_uuid()::text)
             RETURNING *
         )
         SELECT i.id, i.title, i.description,
@@ -109,7 +100,8 @@ pub async fn create(
                i.location, i.color,
                i."createdBy" AS created_by,
                i."createdAt" AT TIME ZONE 'UTC' AS created_at,
-               i.private, u.username AS creator_name
+               i.private, u.username AS creator_name,
+               i.share_token
         FROM inserted i
         LEFT JOIN "Users" u ON i."createdBy" = u.id
         "#
@@ -120,25 +112,24 @@ pub async fn create(
     .bind(&body.location)
     .bind(&body.color)
     .bind(&auth.0.sub)
-    .bind(body.private.unwrap_or(false))
+    .bind(is_private)
     .fetch_one(&state.db)
     .await?;
+
+    if !is_private {
+        send_discord_notification(&state, "created", &event).await;
+    }
 
     Ok(Json(event))
 }
 
 /// Update an existing event
 #[utoipa::path(
-    put,
-    path = "/api/events/{id}",
-    tag = "Events",
+    put, path = "/api/events/{id}", tag = "Events",
     security(("bearer_auth" = [])),
     params(("id" = i64, Path, description = "Event ID")),
     request_body = UpdateEventRequest,
-    responses(
-        (status = 200, description = "Updated event", body = EventWithCreator),
-        (status = 404, description = "Event not found"),
-    )
+    responses((status = 200, body = EventWithCreator), (status = 404))
 )]
 pub async fn update(
     auth: AuthUser,
@@ -149,6 +140,8 @@ pub async fn update(
     if body.title.trim().is_empty() {
         return Err(AppError::BadRequest("Title is required".into()));
     }
+
+    let is_private = body.private.unwrap_or(false);
 
     let event = sqlx::query_as::<_, EventWithCreator>(
         r#"
@@ -163,7 +156,8 @@ pub async fn update(
                u.location, u.color,
                u."createdBy" AS created_by,
                u."createdAt" AT TIME ZONE 'UTC' AS created_at,
-               u.private, usr.username AS creator_name
+               u.private, usr.username AS creator_name,
+               u.share_token
         FROM updated u
         LEFT JOIN "Users" usr ON u."createdBy" = usr.id
         "#
@@ -173,43 +167,60 @@ pub async fn update(
     .bind(body.date)
     .bind(&body.location)
     .bind(&body.color)
-    .bind(body.private.unwrap_or(false))
+    .bind(is_private)
     .bind(id)
     .bind(&auth.0.sub)
     .fetch_optional(&state.db)
     .await?
     .ok_or(AppError::NotFound)?;
 
+    if !is_private {
+        send_discord_notification(&state, "updated", &event).await;
+    }
+
     Ok(Json(event))
 }
 
 /// Delete an event
 #[utoipa::path(
-    delete,
-    path = "/api/events/{id}",
-    tag = "Events",
+    delete, path = "/api/events/{id}", tag = "Events",
     security(("bearer_auth" = [])),
     params(("id" = i64, Path, description = "Event ID")),
-    responses(
-        (status = 200, description = "Deleted"),
-        (status = 404, description = "Event not found"),
-    )
+    responses((status = 200, description = "Deleted"), (status = 404))
 )]
 pub async fn delete(
     auth: AuthUser,
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Json<serde_json::Value>> {
-    let deleted = sqlx::query(
-        r#"DELETE FROM "Events" WHERE id = $1 AND "createdBy" = $2 RETURNING id"#
+    let event = sqlx::query_as::<_, EventWithCreator>(
+        r#"
+        SELECT e.id, e.title, e.description,
+               e.date AT TIME ZONE 'UTC' AS date,
+               e.location, e.color,
+               e."createdBy" AS created_by,
+               e."createdAt" AT TIME ZONE 'UTC' AS created_at,
+               e.private, u.username AS creator_name,
+               e.share_token
+        FROM "Events" e
+        LEFT JOIN "Users" u ON e."createdBy" = u.id
+        WHERE e.id = $1 AND e."createdBy" = $2
+        "#
     )
     .bind(id)
     .bind(&auth.0.sub)
     .fetch_optional(&state.db)
-    .await?;
+    .await?
+    .ok_or(AppError::NotFound)?;
 
-    if deleted.is_none() {
-        return Err(AppError::NotFound);
+    sqlx::query(r#"DELETE FROM "Events" WHERE id = $1 AND "createdBy" = $2"#)
+        .bind(id)
+        .bind(&auth.0.sub)
+        .execute(&state.db)
+        .await?;
+
+    if !event.private {
+        send_discord_notification(&state, "deleted", &event).await;
     }
 
     Ok(Json(serde_json::json!({ "success": true })))

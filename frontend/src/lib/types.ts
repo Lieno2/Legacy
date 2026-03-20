@@ -4,6 +4,7 @@ export interface User {
   email: string;
   perms: number;
   created_at: string | null;
+  avatar_url: string | null;
 }
 
 export interface Event {
@@ -17,20 +18,20 @@ export interface Event {
   created_at: string | null;
   private: boolean;
   creator_name: string | null;
+  share_token: string | null;
 }
 
 export interface EventMember {
   event_id: number;
   user_id: string;
   username: string | null;
+  avatar_url: string | null;
   status: 'going' | 'late' | 'not_going';
   late_minutes: number | null;
   joined_at: string | null;
 }
 
 export type RsvpStatus = 'going' | 'late' | 'not_going';
-
-// ── Polls ────────────────────────────────────────────────────────────────────
 
 export interface PollChoice {
   id: number;

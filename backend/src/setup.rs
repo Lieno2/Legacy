@@ -11,20 +11,14 @@ pub async fn run_setup(db: &PgPool, cfg: &Config) {
             }
         };
 
-        // First ensure no stale setup-account id row blocks us
-        let _ = sqlx::query(r#"DELETE FROM "Users" WHERE id = 'setup-account' AND email != $1"#)
-            .bind(&cfg.setup_account_email)
-            .execute(db)
-            .await;
-
+        // If a user with this email already exists, just update their password
+        // and ensure they have admin perms — never touch their ID (would break FKs)
         let result = sqlx::query(
             r#"
             INSERT INTO "Users" (id, username, email, "passwordHash", perms)
-            VALUES ('setup-account', 'Setup Admin', $1, $2, 999)
+            VALUES (gen_random_uuid()::text, 'Admin', $1, $2, 999)
             ON CONFLICT (email) DO UPDATE
-                SET id = 'setup-account',
-                    username = 'Setup Admin',
-                    "passwordHash" = EXCLUDED."passwordHash",
+                SET "passwordHash" = EXCLUDED."passwordHash",
                     perms = 999
             "#
         )
@@ -34,17 +28,27 @@ pub async fn run_setup(db: &PgPool, cfg: &Config) {
         .await;
 
         match result {
-            Ok(_) => tracing::info!("✅ Setup account ready: {}", cfg.setup_account_email),
+            Ok(_)  => tracing::info!("✅ Setup account ready: {}", cfg.setup_account_email),
             Err(e) => tracing::error!("Setup account: failed to upsert user: {}", e),
         }
     } else {
-        let result = sqlx::query(r#"DELETE FROM "Users" WHERE id = 'setup-account'"#)
-            .execute(db)
-            .await;
+        // Only delete if no events reference this account
+        // (delete only the setup-account id row that has no events)
+        let result = sqlx::query(
+            r#"
+            DELETE FROM "Users"
+            WHERE id = 'setup-account'
+              AND NOT EXISTS (
+                SELECT 1 FROM "Events" WHERE "createdBy" = 'setup-account'
+              )
+            "#
+        )
+        .execute(db)
+        .await;
 
         match result {
             Ok(r) if r.rows_affected() > 0 => tracing::info!("Setup account disabled and removed"),
-            Ok(_) => {}
+            Ok(_)  => {}
             Err(e) => tracing::error!("Setup account: failed to remove user: {}", e),
         }
     }

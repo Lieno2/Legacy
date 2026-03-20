@@ -4,6 +4,7 @@
   import { auth } from '$lib/stores';
   import { apiFetch } from '$lib/api';
   import type { User } from '$lib/types';
+  import { ModeWatcher } from 'mode-watcher';
 
   onMount(async () => {
     try {
@@ -15,4 +16,5 @@
   });
 </script>
 
+<ModeWatcher defaultMode="dark" />
 <slot />

@@ -6,8 +6,24 @@
   import type { Event } from '$lib/types';
   import EventModal from '$lib/components/EventModal.svelte';
   import EventDetail from '$lib/components/EventDetail.svelte';
+  import HappeningSoon from '$lib/components/HappeningSoon.svelte';
+  import Avatar from '$lib/components/Avatar.svelte';
   import { goto } from '$app/navigation';
-  import { ChevronLeft, ChevronRight, Search, Plus, Lock, Clock } from 'lucide-svelte';
+  import { toggleMode } from 'mode-watcher';
+
+  let isDark = true;
+  onMount(() => {
+    isDark = document.documentElement.classList.contains('dark');
+    const obs = new MutationObserver(() => {
+      isDark = document.documentElement.classList.contains('dark');
+    });
+    obs.observe(document.documentElement, { attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  });
+  import {
+    ChevronLeft, ChevronRight, Search, Plus, Lock, Clock,
+    Sun, Moon, Shield, User
+  } from 'lucide-svelte';
 
   let events: Event[] = [];
   let loading = true;
@@ -22,6 +38,7 @@
   let detailEvent: Event | null  = null;
 
   $: user = $auth.user;
+  $: isAdmin = (user?.perms ?? 0) >= 999;
 
   onMount(async () => {
     if (!localStorage.getItem('access_token')) { goto('/login'); return; }
@@ -87,11 +104,49 @@
 
   function isSoon(ev: Event): boolean {
     const diff = new Date(ev.date).getTime() - Date.now();
-    return diff > 0 && diff < 2 * 60 * 60 * 1000;
+    return diff > 0 && diff < 48 * 60 * 60 * 1000;
   }
 
   $: initials = user?.username?.[0]?.toUpperCase() ?? '?';
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+
+  function handleKeydown(e: KeyboardEvent) {
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    // Close dialogs with Escape
+    if (e.key === 'Escape') {
+      if (showCreate || editingEvent) { showCreate = false; editingEvent = null; createDate = ''; return; }
+      if (detailEvent) { detailEvent = null; return; }
+    }
+
+    // Block other shortcuts when a modal is open
+    if (showCreate || editingEvent || detailEvent) return;
+
+    switch (e.key) {
+      case 'n':
+        e.preventDefault();
+        createDate = toLocalDatetime(today);
+        showCreate = true;
+        break;
+      case 't':
+        e.preventDefault();
+        goToday();
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        prevMonth();
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        nextMonth();
+        break;
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleKeydown} />
 
 <div class="h-screen bg-background text-foreground flex flex-col overflow-hidden">
   <!-- Top bar -->
@@ -105,6 +160,7 @@
         <ChevronRight class="w-4 h-4" />
       </button>
     </div>
+
     <button on:click={goToday}
       class="h-7 px-3 rounded-lg border border-border text-xs font-medium hover:bg-muted transition">
       Today
@@ -112,23 +168,48 @@
 
     <div class="flex-1"></div>
 
+    <!-- Search -->
     <div class="relative">
       <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
       <input
         bind:value={search}
-        placeholder="Search events..."
+        placeholder="Search events…"
         class="h-8 w-48 rounded-lg border border-border bg-muted/40 pl-8 pr-3 text-sm outline-none
                focus:border-ring focus:ring-2 focus:ring-ring/20 focus:bg-transparent transition
                placeholder:text-muted-foreground/60"
       />
     </div>
 
-    <a href="/account"
-      class="w-7 h-7 rounded-full bg-muted border border-border flex items-center justify-center
-             text-xs font-semibold hover:ring-2 hover:ring-ring/50 transition select-none">
-      {initials}
+    <!-- Theme toggle -->
+    <button
+      on:click={toggleMode}
+      title="Toggle theme (no shortcut)"
+      class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground"
+    >
+      {#if isDark}
+        <Sun class="w-4 h-4" />
+      {:else}
+        <Moon class="w-4 h-4" />
+      {/if}
+    </button>
+
+    <!-- Admin link (only for admins) -->
+    {#if isAdmin}
+      <a href="/admin"
+        title="Admin panel"
+        class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-amber-500/10 transition text-amber-400">
+        <Shield class="w-4 h-4" />
+      </a>
+    {/if}
+
+    <!-- Avatar / account -->
+    <a href="/account" class="rounded-full hover:ring-2 hover:ring-ring/50 transition">
+      <Avatar username={user?.username ?? '?'} avatarUrl={user?.avatar_url ?? null} size={28} />
     </a>
   </header>
+
+  <!-- Happening Soon banner -->
+  <HappeningSoon {events} on:open={e => openDetail(e.detail)} />
 
   <!-- Day headers -->
   <div class="grid grid-cols-7 border-b border-border shrink-0">
@@ -210,6 +291,14 @@
       {/each}
     </div>
   {/if}
+
+  <!-- Keyboard hint -->
+  <div class="fixed bottom-3 right-4 hidden md:flex items-center gap-3 text-[10px] text-muted-foreground/40 select-none pointer-events-none">
+    <span><kbd class="px-1 py-0.5 rounded bg-muted/40 font-mono border border-border/30">n</kbd> new</span>
+    <span><kbd class="px-1 py-0.5 rounded bg-muted/40 font-mono border border-border/30">t</kbd> today</span>
+    <span><kbd class="px-1 py-0.5 rounded bg-muted/40 font-mono border border-border/30">←→</kbd> month</span>
+    <span><kbd class="px-1 py-0.5 rounded bg-muted/40 font-mono border border-border/30">esc</kbd> close</span>
+  </div>
 </div>
 
 {#if showCreate || editingEvent}

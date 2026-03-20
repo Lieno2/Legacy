@@ -145,8 +145,11 @@ async fn main() {
 
     setup::run_setup(&pg_pool, &cfg).await;
 
+    // Strip trailing slash so CORS origin matching is exact
+    let origin = cfg.frontend_url.trim_end_matches('/').to_string();
+
     let cors = CorsLayer::new()
-        .allow_origin(cfg.frontend_url.parse::<HeaderValue>().unwrap())
+        .allow_origin(origin.parse::<HeaderValue>().unwrap())
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
         .allow_credentials(true);

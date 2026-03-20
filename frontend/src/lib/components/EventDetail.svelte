@@ -3,9 +3,10 @@
   import { apiFetch } from '$lib/api';
   import { formatDate, formatTime } from '$lib/utils';
   import type { Event, EventMember, RsvpStatus, Poll } from '$lib/types';
-  import { X, MapPin, Clock, Lock, Pencil, Trash2, Users, Check, Timer, XCircle, AlertCircle, Loader2, Minus, Plus } from 'lucide-svelte';
+  import { X, MapPin, Clock, Lock, Pencil, Trash2, Users, Check, Timer, XCircle, AlertCircle, Loader2, Minus, Plus, Link, CheckCheck } from 'lucide-svelte';
   import PollAnswerModal from './PollAnswerModal.svelte';
   import PollResults from './PollResults.svelte';
+  import Avatar from './Avatar.svelte';
 
   export let event: Event;
   export let currentUserId: string | null;
@@ -19,6 +20,7 @@
   let membersLoading = true;
   let membersError = '';
   let rsvpError = '';
+  let linkCopied = false;
 
   // ── Poll state ────────────────────────────────────────────────────────────
   let poll: Poll | null = null;
@@ -118,8 +120,17 @@
     if (!isNaN(v)) clampMinutes(v);
   }
 
+  async function copyShareLink() {
+    if (!event.share_token) return;
+    const url = `${window.location.origin}/event/${event.share_token}`;
+    await navigator.clipboard.writeText(url);
+    linkCopied = true;
+    setTimeout(() => (linkCopied = false), 2000);
+  }
+
   $: isOwner = currentUserId != null && currentUserId === event.created_by;
   $: eventColor = event.color ?? '#6366f1';
+  $: canShare = !event.private && !!event.share_token;
 
   const RSVP_BTNS: { status: RsvpStatus; label: string; icon: any; active: string }[] = [
     { status: 'going',     label: 'Going',       icon: Check,   active: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' },
@@ -176,6 +187,24 @@
           <p class="text-xs text-muted-foreground mt-0.5">by {event.creator_name ?? 'Unknown'}</p>
         </div>
         <div class="flex items-center gap-0.5 shrink-0">
+          <!-- Share button — only for public events with a token -->
+          {#if canShare}
+            <button
+              on:click={copyShareLink}
+              aria-label="Copy share link"
+              title={linkCopied ? 'Link copied!' : 'Copy share link'}
+              class="w-7 h-7 rounded-lg flex items-center justify-center transition
+                     {linkCopied
+                       ? 'text-emerald-400 bg-emerald-500/10'
+                       : 'hover:bg-muted text-muted-foreground hover:text-foreground'}"
+            >
+              {#if linkCopied}
+                <CheckCheck class="w-3.5 h-3.5" />
+              {:else}
+                <Link class="w-3.5 h-3.5" />
+              {/if}
+            </button>
+          {/if}
           {#if isOwner}
             <button on:click={() => dispatch('edit')} aria-label="Edit event"
               class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition text-muted-foreground hover:text-foreground">
@@ -202,7 +231,13 @@
         {#if event.location}
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin class="w-3.5 h-3.5 shrink-0" />
-            <span>{event.location}</span>
+            <span class="flex-1">{event.location}</span>
+            <a
+              href={event.location.startsWith('http') ? event.location : `https://maps.google.com/?q=${encodeURIComponent(event.location)}`}
+              target="_blank" rel="noopener noreferrer"
+              class="text-xs underline underline-offset-3 hover:no-underline shrink-0"
+              style="color:{eventColor};"
+            >Maps</a>
           </div>
         {/if}
       </div>
@@ -294,11 +329,7 @@
             {#each members as m}
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <div
-                    class="w-5 h-5 rounded-full border border-border flex items-center justify-center text-[10px] font-bold uppercase"
-                    style="background:hsl({((m.username ?? '?').charCodeAt(0)*47)%360},40%,25%); color:hsl({((m.username ?? '?').charCodeAt(0)*47)%360},70%,70%);"
-                    aria-hidden="true"
-                  >{(m.username ?? '?')[0]}</div>
+                  <Avatar username={m.username ?? '?'} avatarUrl={m.avatar_url ?? null} size={20} />
                   <span class="text-sm">{m.username ?? 'Unknown'}</span>
                 </div>
                 <span class="text-[11px] px-1.5 py-0.5 rounded-full border {STATUS_BADGE[m.status as RsvpStatus]}">

@@ -23,15 +23,10 @@ pub struct RsvpRequest {
 
 /// List RSVPs for an event
 #[utoipa::path(
-    get,
-    path = "/api/rsvp",
-    tag = "RSVP",
+    get, path = "/api/rsvp", tag = "RSVP",
     security(("bearer_auth" = [])),
     params(("event_id" = i64, Query, description = "Event ID")),
-    responses(
-        (status = 200, description = "List of RSVPs", body = Vec<EventMember>),
-        (status = 401, description = "Unauthorized"),
-    )
+    responses((status = 200, body = Vec<EventMember>), (status = 401))
 )]
 pub async fn list(
     _auth: AuthUser,
@@ -43,6 +38,7 @@ pub async fn list(
         SELECT em."eventId"  AS event_id,
                em."userId"   AS user_id,
                u.username,
+               u.avatar_url,
                em.status,
                em."lateMinutes" AS late_minutes,
                em."joinedAt" AT TIME ZONE 'UTC' AS joined_at
@@ -60,16 +56,9 @@ pub async fn list(
 
 /// Upsert RSVP for an event
 #[utoipa::path(
-    post,
-    path = "/api/rsvp",
-    tag = "RSVP",
-    security(("bearer_auth" = [])),
-    request_body = RsvpRequest,
-    responses(
-        (status = 200, description = "RSVP saved"),
-        (status = 400, description = "Invalid status"),
-        (status = 404, description = "Event not found"),
-    )
+    post, path = "/api/rsvp", tag = "RSVP",
+    security(("bearer_auth" = [])), request_body = RsvpRequest,
+    responses((status = 200), (status = 400), (status = 404))
 )]
 pub async fn upsert(
     auth: AuthUser,
@@ -87,9 +76,7 @@ pub async fn upsert(
     .fetch_one(&state.db)
     .await?;
 
-    if !exists {
-        return Err(AppError::NotFound);
-    }
+    if !exists { return Err(AppError::NotFound); }
 
     let late_minutes = if body.status == "late" { body.late_minutes } else { None };
 
@@ -114,14 +101,10 @@ pub async fn upsert(
 
 /// Remove RSVP for an event
 #[utoipa::path(
-    delete,
-    path = "/api/rsvp",
-    tag = "RSVP",
+    delete, path = "/api/rsvp", tag = "RSVP",
     security(("bearer_auth" = [])),
     params(("event_id" = i64, Query, description = "Event ID")),
-    responses(
-        (status = 200, description = "RSVP removed"),
-    )
+    responses((status = 200))
 )]
 pub async fn remove(
     auth: AuthUser,

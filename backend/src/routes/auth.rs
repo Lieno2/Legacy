@@ -96,6 +96,7 @@ pub async fn login(
             email: user.email,
             perms: user.perms,
             created_at: user.created_at,
+            avatar_url: None,
         },
     }))
 }
@@ -167,7 +168,7 @@ pub async fn me(
     State(state): State<AppState>,
 ) -> Result<Json<UserPublic>> {
     let user = sqlx::query_as::<_, UserPublic>(
-        r#"SELECT id, username, email, perms,
+        r#"SELECT id, username, email, perms, avatar_url,
            "createdAt" AT TIME ZONE 'UTC' AS created_at
            FROM "Users" WHERE id = $1"#
     )

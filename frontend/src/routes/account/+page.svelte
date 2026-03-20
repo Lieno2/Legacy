@@ -5,33 +5,55 @@
   import { goto } from '$app/navigation';
   import type { User } from '$lib/types';
   import { ArrowLeft, LogOut, Shield } from 'lucide-svelte';
+  import Avatar from '$lib/components/Avatar.svelte';
 
   let profile: User | null = null;
   let loading = true;
   let username = '', email = '', currentPw = '', newPw = '', confirmPw = '';
+  let avatarUrl: string | null = null;
+  let avatarChanged = false;
   let saving = false, error = '', success = '';
 
   onMount(async () => {
     try {
-      profile  = await apiFetch<User>('/api/account');
-      username = profile.username;
-      email    = profile.email;
+      profile   = await apiFetch<User>('/api/account');
+      username  = profile.username;
+      email     = profile.email;
+      avatarUrl = profile.avatar_url ?? null;
     } catch { goto('/login'); }
     finally { loading = false; }
   });
+
+  function handleAvatarChange(e: CustomEvent<string>) {
+    avatarUrl    = e.detail;
+    avatarChanged = true;
+  }
+
+  function removeAvatar() {
+    avatarUrl    = null;
+    avatarChanged = true;
+  }
 
   async function handleSave(e: SubmitEvent) {
     e.preventDefault();
     error = ''; success = '';
     if (newPw && newPw !== confirmPw) { error = 'Passwords do not match'; return; }
-    if (newPw && newPw.length < 8) { error = 'Password must be at least 8 characters'; return; }
+    if (newPw && newPw.length < 8)    { error = 'Password must be at least 8 characters'; return; }
     saving = true;
     try {
       const updated = await apiFetch<User>('/api/account', {
         method: 'PUT',
-        body: JSON.stringify({ username, email, current_password: currentPw || undefined, new_password: newPw || undefined })
+        body: JSON.stringify({
+          username,
+          email,
+          current_password: currentPw || undefined,
+          new_password:     newPw     || undefined,
+          avatar_url:       avatarUrl ?? null,
+        })
       });
-      profile = updated;
+      profile       = updated;
+      avatarUrl     = updated.avatar_url ?? null;
+      avatarChanged = false;
       auth.update(s => ({ ...s, user: updated }));
       success = 'Account updated successfully';
       currentPw = ''; newPw = ''; confirmPw = '';
@@ -80,12 +102,17 @@
   </header>
 
   <div class="max-w-lg mx-auto px-5 py-8 flex flex-col gap-5">
+
     <!-- Profile card -->
     <div class="bg-card border border-border rounded-2xl p-5 flex items-center gap-4">
-      <div class="w-14 h-14 rounded-full bg-muted border border-border flex items-center justify-center text-2xl font-bold uppercase shrink-0">
-        {profile?.username?.[0] ?? '?'}
-      </div>
-      <div class="min-w-0">
+      <Avatar
+        username={profile?.username ?? '?'}
+        {avatarUrl}
+        size={56}
+        editable
+        on:change={handleAvatarChange}
+      />
+      <div class="min-w-0 flex-1">
         <div class="font-semibold">{profile?.username}</div>
         <div class="text-sm text-muted-foreground truncate">{profile?.email}</div>
         <div class="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -101,6 +128,16 @@
           {/if}
         </div>
       </div>
+    </div>
+
+    <!-- Avatar hint -->
+    <div class="flex items-center justify-between px-1">
+      <p class="text-xs text-muted-foreground">Click your avatar to change your profile picture.</p>
+      {#if avatarUrl}
+        <button on:click={removeAvatar} class="text-xs text-red-400 hover:text-red-300 transition">
+          Remove photo
+        </button>
+      {/if}
     </div>
 
     <!-- Edit form -->
