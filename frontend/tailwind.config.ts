@@ -6,31 +6,98 @@ export default {
   theme: {
     extend: {
       colors: {
-        background:  'hsl(var(--background))',
-        foreground:  'hsl(var(--foreground))',
-        card:        'hsl(var(--card))',
-        border:      'hsl(var(--border))',
-        input:       'hsl(var(--input))',
-        primary: {
-          DEFAULT:    'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))'
-        },
+        // ── MD3 semantic tokens (from design system) ──────────────────────
+        background:                  '#0e0e0e',
+        surface:                     '#0e0e0e',
+        'surface-dim':               '#0e0e0e',
+        'surface-bright':            '#2c2c2c',
+        'surface-variant':           '#262626',
+        'surface-container-lowest':  '#000000',
+        'surface-container-low':     '#131313',
+        'surface-container':         '#1a1a1a',
+        'surface-container-high':    '#20201f',
+        'surface-container-highest': '#262626',
+        'surface-tint':              '#b6a0ff',
+        'on-background':             '#ffffff',
+        'on-surface':                '#ffffff',
+        'on-surface-variant':        '#adaaaa',
+        'inverse-surface':           '#fcf9f8',
+        'inverse-on-surface':        '#565555',
+        // primary
+        primary:                     '#b6a0ff',
+        'primary-dim':               '#7e51ff',
+        'primary-fixed':             '#a98fff',
+        'primary-fixed-dim':         '#9c7eff',
+        'primary-container':         '#a98fff',
+        'on-primary':                '#340090',
+        'on-primary-fixed':          '#000000',
+        'on-primary-fixed-variant':  '#32008a',
+        'on-primary-container':      '#280072',
+        'inverse-primary':           '#6834eb',
+        // secondary
+        secondary:                   '#00e3fd',
+        'secondary-dim':             '#00d4ec',
+        'secondary-fixed':           '#26e6ff',
+        'secondary-fixed-dim':       '#00d7f0',
+        'secondary-container':       '#006875',
+        'on-secondary':              '#004d57',
+        'on-secondary-fixed':        '#003a42',
+        'on-secondary-fixed-variant':'#005964',
+        'on-secondary-container':    '#e8fbff',
+        // tertiary
+        tertiary:                    '#ff97b8',
+        'tertiary-dim':              '#ef77a0',
+        'tertiary-fixed':            '#ff8db2',
+        'tertiary-fixed-dim':        '#f57ca5',
+        'tertiary-container':        '#fc81ab',
+        'on-tertiary':               '#6a0936',
+        'on-tertiary-fixed':         '#380019',
+        'on-tertiary-fixed-variant': '#70103b',
+        'on-tertiary-container':     '#59002b',
+        // error
+        error:                       '#ff6e84',
+        'error-dim':                 '#d73357',
+        'error-container':           '#a70138',
+        'on-error':                  '#490013',
+        'on-error-container':        '#ffb2b9',
+        // outline
+        outline:                     '#767575',
+        'outline-variant':           '#484847',
+        // ── shadcn-compat aliases (used by existing components) ───────────
+        foreground:   '#ffffff',
+        card:         '#1a1a1a',
+        border:       '#262626',
+        input:        '#1a1a1a',
         muted: {
-          DEFAULT:    'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))'
+          DEFAULT:    '#1a1a1a',
+          foreground: '#adaaaa',
         },
         destructive: {
-          DEFAULT:    'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))'
+          DEFAULT:    '#ff6e84',
+          foreground: '#490013',
         },
-        ring: 'hsl(var(--ring))'
+        ring:         '#b6a0ff',
+      },
+      fontFamily: {
+        headline: ['Epilogue', 'sans-serif'],
+        body:     ['Inter', 'sans-serif'],
+        label:    ['Inter', 'sans-serif'],
+        sans:     ['Inter', 'sans-serif'],
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)'
-      }
-    }
+        DEFAULT: '0.25rem',
+        sm:      '0.25rem',
+        md:      '0.375rem',
+        lg:      '0.5rem',
+        xl:      '0.75rem',
+        '2xl':   '1rem',
+        full:    '9999px',
+      },
+      boxShadow: {
+        glow:    '0 0 24px 0 rgba(182,160,255,0.15)',
+        'glow-sm':'0 0 12px 0 rgba(182,160,255,0.10)',
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 } satisfies Config;
