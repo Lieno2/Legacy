@@ -1,18 +1,14 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
+import { PUBLIC_API_URL } from '$env/static/public';
 import { auth } from '$lib/stores';
 
-// Validate that the API URL is configured. Fail loudly in dev, warn in prod.
-const RAW_BASE = import.meta.env.PUBLIC_API_URL;
-if (!RAW_BASE) {
+if (!PUBLIC_API_URL) {
   const msg = '[Legacy] PUBLIC_API_URL is not set. Copy frontend/.env.example to frontend/.env and set it.';
-  if (import.meta.env.DEV) {
-    throw new Error(msg);
-  } else {
-    console.error(msg);
-  }
+  throw new Error(msg);
 }
-const BASE: string = (RAW_BASE ?? 'http://localhost:3001').replace(/\/$/, '');
+
+const BASE: string = PUBLIC_API_URL.replace(/\/$/, '');
 
 let _accessToken: string | null = null;
 let _refreshToken: string | null = null;

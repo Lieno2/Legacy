@@ -44,7 +44,6 @@
     templatesLoading = true;
     try {
       const all = await apiFetch<PollTemplate[]>('/api/polls/templates');
-      // Only show global (admin-created) templates
       templates = all.filter(t => t.global);
     } catch {
       templates = [];
@@ -55,7 +54,6 @@
 
   function selectTemplate(t: PollTemplate) {
     selectedTemplate = t;
-    // Pre-fill the exported props so the parent EventModal gets the values
     pollType      = t.poll_type;
     question      = t.question ?? '';
     allowMultiple = t.allow_multiple;
@@ -65,7 +63,6 @@
 
   function clearTemplate() {
     selectedTemplate = null;
-    // Reset to sensible defaults so the user can configure manually
     pollType      = 'choice';
     question      = '';
     allowMultiple = false;
@@ -95,20 +92,20 @@
 
 <div class="flex flex-col gap-3 pt-1 border-t border-border">
   <!-- Toggle row -->
-  <label class="flex items-center justify-between cursor-pointer select-none">
+  <div class="flex items-center justify-between">
     <span class="flex items-center gap-2 text-sm text-muted-foreground">
       <HelpCircle class="w-3.5 h-3.5" />
       Add a poll
       <span class="text-[11px] text-muted-foreground/50">(optional)</span>
     </span>
     <div class="relative">
-      <input type="checkbox" bind:checked={enabled} class="sr-only peer" />
-      <div class="w-9 h-5 rounded-full border transition-colors duration-200
-                  bg-muted border-border peer-checked:bg-primary peer-checked:border-primary"></div>
-      <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm
+      <input type="checkbox" id="poll-enabled" bind:checked={enabled} class="sr-only peer" />
+      <label for="poll-enabled" class="block w-9 h-5 rounded-full border cursor-pointer transition-colors duration-200
+                bg-muted border-border peer-checked:bg-primary peer-checked:border-primary"></label>
+      <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm pointer-events-none
                   transition-transform duration-200 peer-checked:translate-x-4"></div>
     </div>
-  </label>
+  </div>
 
   {#if enabled}
     <div class="flex flex-col gap-3 pl-1">
@@ -116,12 +113,11 @@
       <!-- ── Template dropdown ─────────────────────────────────────────── -->
       {#if templates.length > 0 || templatesLoading}
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Use a template <span class="normal-case font-normal text-muted-foreground/50">(optional)</span>
-          </label>
+          </span>
 
           {#if selectedTemplate}
-            <!-- Selected state: show chip + clear button -->
             <div class="flex items-center justify-between px-3 h-9 rounded-lg border border-primary/40
                         bg-primary/10 text-sm text-primary">
               <span class="font-medium">{selectedTemplate.name}</span>
@@ -136,7 +132,6 @@
               </button>
             </div>
           {:else}
-            <!-- Closed / open dropdown -->
             <div class="relative">
               <button
                 type="button"
@@ -175,7 +170,7 @@
 
         <!-- Poll type selector -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</label>
+          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</span>
           <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
             {#each Object.entries(TYPE_LABELS) as [t, meta]}
               <button
@@ -196,8 +191,9 @@
 
         <!-- Question -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Question</label>
+          <label for="poll-question" class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Question</label>
           <input
+            id="poll-question"
             bind:value={question}
             placeholder={
               pollType === 'yesno'  ? 'e.g. Are you coming?' :
@@ -236,15 +232,16 @@
           <!-- Choices -->
           <div class="flex flex-col gap-1.5">
             <div class="flex items-center justify-between">
-              <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {pollType === 'date' ? 'Date / Time options' : 'Choices'}
-              </label>
+              </span>
               <span class="text-[11px] text-muted-foreground/50">{choices.length}/10</span>
             </div>
             {#each choices as choice, i}
               <div class="flex items-center gap-2">
                 <span class="text-xs text-muted-foreground/40 w-4 text-right shrink-0">{i + 1}</span>
                 <input
+                  id="poll-choice-{i}"
                   value={choice}
                   on:input={(e) => updateChoice(i, (e.target as HTMLInputElement).value)}
                   placeholder={pollType === 'date' ? 'e.g. Saturday 5pm' : `Choice ${i + 1}`}
@@ -256,7 +253,7 @@
                   type="button"
                   on:click={() => removeChoice(i)}
                   disabled={choices.length <= 2}
-                  aria-label="Remove"
+                  aria-label="Remove choice {i + 1}"
                   class="w-7 h-7 rounded-lg flex items-center justify-center
                          text-muted-foreground hover:text-red-400 hover:bg-red-500/10
                          transition disabled:opacity-25 disabled:cursor-not-allowed shrink-0"
@@ -276,16 +273,18 @@
           </div>
 
           <!-- Allow multiple -->
-          <label class="flex items-center justify-between cursor-pointer select-none">
-            <span class="text-xs text-muted-foreground">Allow multiple selections</span>
+          <div class="flex items-center justify-between">
+            <label for="poll-allow-multiple" class="text-xs text-muted-foreground cursor-pointer select-none">
+              Allow multiple selections
+            </label>
             <div class="relative">
-              <input type="checkbox" bind:checked={allowMultiple} class="sr-only peer" />
-              <div class="w-9 h-5 rounded-full border transition-colors duration-200
-                          bg-muted border-border peer-checked:bg-primary peer-checked:border-primary"></div>
-              <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm
+              <input type="checkbox" id="poll-allow-multiple" bind:checked={allowMultiple} class="sr-only peer" />
+              <label for="poll-allow-multiple" class="block w-9 h-5 rounded-full border cursor-pointer transition-colors duration-200
+                          bg-muted border-border peer-checked:bg-primary peer-checked:border-primary"></label>
+              <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm pointer-events-none
                           transition-transform duration-200 peer-checked:translate-x-4"></div>
             </div>
-          </label>
+          </div>
         {/if}
 
       {:else}
