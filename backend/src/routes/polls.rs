@@ -11,7 +11,7 @@ use crate::{
     routes::AppState,
 };
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────────────
 
 #[derive(Deserialize, ToSchema)]
 pub struct EventIdQuery {
@@ -111,7 +111,7 @@ pub struct PollTemplate {
     pub created_by: Option<String>,
 }
 
-// ── GET /api/polls?event_id= ─────────────────────────────────────────────────
+// ── GET /api/polls?event_id= ────────────────────────────────────────────────────────────
 
 #[utoipa::path(get, path = "/api/polls", tag = "Polls",
     security(("bearer_auth" = [])),
@@ -135,7 +135,6 @@ pub async fn get_poll(
         return Ok(Json(None));
     };
 
-    // Choice answers
     let choices = sqlx::query_as::<_, PollChoice>(
         r#"SELECT c.id, c.label, c.position,
              COUNT(a."choiceId")::BIGINT AS answer_count
@@ -157,7 +156,6 @@ pub async fn get_poll(
         .fetch_all(&state.db)
         .await?;
 
-    // Text answer
     let my_text_answer = sqlx::query_scalar::<_, String>(
         r#"SELECT answer FROM "EventPollTextAnswers" WHERE "pollId" = $1 AND "userId" = $2"#,
     )
@@ -166,7 +164,6 @@ pub async fn get_poll(
         .fetch_optional(&state.db)
         .await?;
 
-    // Rating
     let my_rating = sqlx::query_scalar::<_, i16>(
         r#"SELECT rating FROM "EventPollRatings" WHERE "pollId" = $1 AND "userId" = $2"#,
     )
@@ -197,7 +194,7 @@ pub async fn get_poll(
     })))
 }
 
-// ── POST /api/polls ──────────────────────────────────────────────────────────
+// ── POST /api/polls ───────────────────────────────────────────────────────────────────────
 
 #[utoipa::path(post, path = "/api/polls", tag = "Polls",
     security(("bearer_auth" = [])), request_body = CreatePollRequest,
@@ -215,7 +212,6 @@ pub async fn upsert_poll(
 
     let poll_type = body.poll_type.as_deref().unwrap_or("choice").to_string();
 
-    // Validate choices for types that need them
     let choices: Vec<String> = match poll_type.as_str() {
         "choice" | "date" => {
             let c: Vec<String> = body.choices.unwrap_or_default()
@@ -226,7 +222,7 @@ pub async fn upsert_poll(
             c
         }
         "yesno" => vec!["Yes".into(), "No".into()],
-        "text" | "rating" => vec![], // no choices needed
+        "text" | "rating" => vec![],
         _ => return Err(AppError::BadRequest("Invalid poll type".into())),
     };
 
@@ -242,7 +238,6 @@ pub async fn upsert_poll(
         return Err(AppError::Forbidden);
     }
 
-    // Delete existing poll (cascades to choices + answers)
     sqlx::query(r#"DELETE FROM "EventPolls" WHERE "eventId" = $1"#)
         .bind(body.event_id)
         .execute(&state.db)
@@ -290,7 +285,7 @@ pub async fn upsert_poll(
     }))
 }
 
-// ── DELETE /api/polls?event_id= ──────────────────────────────────────────────
+// ── DELETE /api/polls?event_id= ──────────────────────────────────────────────────────────────
 
 #[utoipa::path(delete, path = "/api/polls", tag = "Polls",
     security(("bearer_auth" = [])),
@@ -318,7 +313,7 @@ pub async fn delete_poll(
     Ok(Json(serde_json::json!({ "success": true })))
 }
 
-// ── POST /api/polls/answer ───────────────────────────────────────────────────
+// ── POST /api/polls/answer ───────────────────────────────────────────────────────────────────
 
 #[utoipa::path(post, path = "/api/polls/answer", tag = "Polls",
     security(("bearer_auth" = [])), request_body = AnswerPollRequest,
@@ -329,14 +324,16 @@ pub async fn answer_poll(
     State(state): State<AppState>,
     Json(body): Json<AnswerPollRequest>,
 ) -> Result<Json<serde_json::Value>> {
-    // Get poll type
-    let poll_type = sqlx::query_scalar::<_, String>(
-        r#"SELECT poll_type FROM "EventPolls" WHERE id = $1"#,
+    // Fetch poll type AND allow_multiple in one query
+    let poll_row = sqlx::query_as::<_, (String, bool)>(
+        r#"SELECT poll_type, "allowMultiple" FROM "EventPolls" WHERE id = $1"#,
     )
         .bind(body.poll_id)
         .fetch_optional(&state.db)
         .await?
         .ok_or(AppError::NotFound)?;
+
+    let (poll_type, allow_multiple) = poll_row;
 
     match poll_type.as_str() {
         "text" => {
@@ -372,6 +369,13 @@ pub async fn answer_poll(
                 .filter(|v| !v.is_empty())
                 .ok_or_else(|| AppError::BadRequest("At least one choice is required".into()))?;
 
+            // Enforce allow_multiple server-side
+            if !allow_multiple && choice_ids.len() > 1 {
+                return Err(AppError::BadRequest(
+                    "This poll does not allow multiple selections".into()
+                ));
+            }
+
             let valid_count = sqlx::query_scalar::<_, i64>(
                 r#"SELECT COUNT(*) FROM "EventPollChoices" WHERE "pollId" = $1 AND id = ANY($2)"#,
             )
@@ -402,7 +406,7 @@ pub async fn answer_poll(
     Ok(Json(serde_json::json!({ "success": true })))
 }
 
-// ── GET /api/polls/voters?event_id= ─────────────────────────────────────────
+// ── GET /api/polls/voters?event_id= ───────────────────────────────────────────────────
 
 #[utoipa::path(get, path = "/api/polls/voters", tag = "Polls",
     security(("bearer_auth" = [])),
@@ -446,7 +450,7 @@ pub async fn get_voters(
     Ok(Json(result))
 }
 
-// ── GET /api/polls/text-answers?event_id= ───────────────────────────────────
+// ── GET /api/polls/text-answers?event_id= ─────────────────────────────────────────────
 
 #[utoipa::path(get, path = "/api/polls/text-answers", tag = "Polls",
     security(("bearer_auth" = [])),
@@ -484,7 +488,7 @@ pub async fn get_text_answers(
     Ok(Json(result))
 }
 
-// ── GET /api/polls/templates ─────────────────────────────────────────────────
+// ── GET /api/polls/templates ───────────────────────────────────────────────────────────────────
 
 #[utoipa::path(get, path = "/api/polls/templates", tag = "Polls",
     security(("bearer_auth" = [])),
@@ -508,7 +512,7 @@ pub async fn list_templates(
     Ok(Json(templates))
 }
 
-// ── POST /api/polls/templates ─────────────────────────────────────────────────
+// ── POST /api/polls/templates ───────────────────────────────────────────────────────────────────
 
 #[utoipa::path(post, path = "/api/polls/templates", tag = "Polls",
     security(("bearer_auth" = [])), request_body = CreateTemplateRequest,
@@ -524,7 +528,6 @@ pub async fn create_template(
         return Err(AppError::BadRequest("Template name is required".into()));
     }
 
-    // Only admins can create global templates
     let is_global = body.global.unwrap_or(false);
     if is_global && user.0.perms < 999 {
         return Err(AppError::Forbidden);
@@ -553,7 +556,7 @@ pub async fn create_template(
     Ok(Json(template))
 }
 
-// ── DELETE /api/polls/templates?id= ──────────────────────────────────────────
+// ── DELETE /api/polls/templates?id= ────────────────────────────────────────────────────────────
 
 #[utoipa::path(delete, path = "/api/polls/templates", tag = "Polls",
     security(("bearer_auth" = [])),
@@ -575,7 +578,6 @@ pub async fn delete_template(
 
     let (created_by, is_global) = row;
 
-    // Global templates require admin; personal templates require ownership
     if is_global && user.0.perms < 999 {
         return Err(AppError::Forbidden);
     }
