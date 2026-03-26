@@ -2,7 +2,17 @@ import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { auth } from '$lib/stores';
 
-const BASE = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:3001';
+// Validate that the API URL is configured. Fail loudly in dev, warn in prod.
+const RAW_BASE = import.meta.env.PUBLIC_API_URL;
+if (!RAW_BASE) {
+  const msg = '[Legacy] PUBLIC_API_URL is not set. Copy frontend/.env.example to frontend/.env and set it.';
+  if (import.meta.env.DEV) {
+    throw new Error(msg);
+  } else {
+    console.error(msg);
+  }
+}
+const BASE: string = (RAW_BASE ?? 'http://localhost:3001').replace(/\/$/, '');
 
 let _accessToken: string | null = null;
 let _refreshToken: string | null = null;
@@ -76,13 +86,20 @@ export async function apiFetch<T = unknown>(
     }
   }
 
+  if (res.status === 429) {
+    const retryAfter = res.headers.get('retry-after');
+    throw new Error(
+      retryAfter
+        ? `Too many requests. Please wait ${retryAfter}s before trying again.`
+        : 'Too many requests. Please wait a moment before trying again.'
+    );
+  }
+
   if (!res.ok) {
-    // Try to parse error body, fall back gracefully
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error ?? err.message ?? `Request failed (${res.status})`);
   }
 
-  // 204 No Content — return empty object cast to T
   if (res.status === 204) return {} as T;
   const text = await res.text();
   if (!text) return {} as T;
