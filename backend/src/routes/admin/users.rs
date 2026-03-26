@@ -1,4 +1,5 @@
 use axum::{extract::{Query, State}, Json};
+use serde::Deserialize;
 
 use crate::{
     auth::AdminUser,
@@ -8,20 +9,37 @@ use crate::{
 };
 use super::{IdQuery, CreateUserRequest, UpdateUserRequest};
 
+#[derive(Deserialize)]
+pub struct PaginationQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
 const SELECT_USER: &str = r#"SELECT id, username, email, perms,
     "createdAt" AT TIME ZONE 'UTC' AS created_at,
     avatar_url FROM "Users""#;
 
 #[utoipa::path(get, path = "/api/admin/users", tag = "Admin",
     security(("bearer_auth" = [])),
+    params(
+        ("limit" = Option<i64>, Query, description = "Max results (default 100, max 500)"),
+        ("offset" = Option<i64>, Query, description = "Offset for pagination (default 0)"),
+    ),
     responses((status = 200, body = Vec<UserPublic>)))]
 pub async fn list_users(
     _admin: AdminUser,
     State(state): State<AppState>,
+    Query(page): Query<PaginationQuery>,
 ) -> Result<Json<Vec<UserPublic>>> {
+    let limit  = page.limit.unwrap_or(100).min(500).max(1);
+    let offset = page.offset.unwrap_or(0).max(0);
+
     let users = sqlx::query_as::<_, UserPublic>(
-        &format!("{} ORDER BY \"createdAt\" ASC", SELECT_USER)
-    ).fetch_all(&state.db).await?;
+        &format!("{} ORDER BY \"createdAt\" ASC LIMIT $1 OFFSET $2", SELECT_USER)
+    )
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.db).await?;
     Ok(Json(users))
 }
 

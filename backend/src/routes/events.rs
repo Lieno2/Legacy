@@ -1,4 +1,4 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::Deserialize;
 use chrono::{DateTime, Utc};
@@ -33,16 +33,32 @@ pub struct UpdateEventRequest {
     pub private: Option<bool>,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct PaginationQuery {
+    /// Maximum number of events to return (default: 100, max: 500)
+    pub limit: Option<i64>,
+    /// Number of events to skip (default: 0)
+    pub offset: Option<i64>,
+}
+
 /// List events visible to the current user
 #[utoipa::path(
     get, path = "/api/events", tag = "Events",
     security(("bearer_auth" = [])),
+    params(
+        ("limit" = Option<i64>, Query, description = "Max results (default 100, max 500)"),
+        ("offset" = Option<i64>, Query, description = "Offset for pagination (default 0)"),
+    ),
     responses((status = 200, body = Vec<EventWithCreator>), (status = 401))
 )]
 pub async fn list(
     auth: AuthUser,
     State(state): State<AppState>,
+    Query(page): Query<PaginationQuery>,
 ) -> Result<Json<Vec<EventWithCreator>>> {
+    let limit  = page.limit.unwrap_or(100).min(500).max(1);
+    let offset = page.offset.unwrap_or(0).max(0);
+
     let events = sqlx::query_as::<_, EventWithCreator>(
         r#"
         SELECT e.id, e.title, e.description,
@@ -62,9 +78,12 @@ pub async fn list(
                 WHERE em."eventId" = e.id AND em."userId" = $1
             )
         ORDER BY e.date ASC
+        LIMIT $2 OFFSET $3
         "#
     )
     .bind(&auth.0.sub)
+    .bind(limit)
+    .bind(offset)
     .fetch_all(&state.db)
     .await?;
 
