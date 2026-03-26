@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    auth::{AuthUser, AdminUser},
+    auth::AuthUser,
     error::{AppError, Result},
     routes::AppState,
 };
@@ -32,7 +32,7 @@ pub struct TemplateIdQuery {
 pub struct CreatePollRequest {
     pub event_id: i64,
     pub question: String,
-    pub poll_type: Option<String>, // 'choice' | 'text' | 'rating' | 'yesno' | 'date'
+    pub poll_type: Option<String>,
     pub choices: Option<Vec<String>>,
     #[serde(default)]
     pub allow_multiple: bool,
@@ -41,9 +41,9 @@ pub struct CreatePollRequest {
 #[derive(Deserialize, ToSchema)]
 pub struct AnswerPollRequest {
     pub poll_id: i64,
-    pub choice_ids: Option<Vec<i64>>,   // for 'choice' and 'yesno' and 'date'
-    pub text_answer: Option<String>,     // for 'text'
-    pub rating: Option<i16>,             // for 'rating' (1-5)
+    pub choice_ids: Option<Vec<i64>>,
+    pub text_answer: Option<String>,
+    pub rating: Option<i16>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -53,7 +53,7 @@ pub struct CreateTemplateRequest {
     pub question: Option<String>,
     pub choices: Option<Vec<String>>,
     pub allow_multiple: Option<bool>,
-    pub global: Option<bool>, // admin only
+    pub global: Option<bool>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
@@ -324,7 +324,6 @@ pub async fn answer_poll(
     State(state): State<AppState>,
     Json(body): Json<AnswerPollRequest>,
 ) -> Result<Json<serde_json::Value>> {
-    // Fetch poll type AND allow_multiple in one query
     let poll_row = sqlx::query_as::<_, (String, bool)>(
         r#"SELECT poll_type, "allowMultiple" FROM "EventPolls" WHERE id = $1"#,
     )
@@ -369,7 +368,6 @@ pub async fn answer_poll(
                 .filter(|v| !v.is_empty())
                 .ok_or_else(|| AppError::BadRequest("At least one choice is required".into()))?;
 
-            // Enforce allow_multiple server-side
             if !allow_multiple && choice_ids.len() > 1 {
                 return Err(AppError::BadRequest(
                     "This poll does not allow multiple selections".into()

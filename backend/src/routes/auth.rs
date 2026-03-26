@@ -50,7 +50,6 @@ pub async fn login(
 ) -> Result<Json<AuthResponse>> {
     tracing::debug!("[LOGIN] Attempt for email: {}", body.email);
 
-    // Fetch user including avatar_url so it is available in the response
     let user = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, "passwordHash" AS password_hash, perms,
            "createdAt" AT TIME ZONE 'UTC' AS created_at
@@ -87,7 +86,6 @@ pub async fn login(
     store_refresh_token(&state.redis, &refresh_token, &user.id, state.cfg.refresh_token_expiry_secs).await
         .map_err(|e| { tracing::error!("[LOGIN] Redis error storing refresh token: {}", e); e })?;
 
-    // Fetch avatar_url separately (not on User model to avoid schema changes)
     let avatar_url = sqlx::query_scalar::<_, Option<String>>(
         r#"SELECT avatar_url FROM "Users" WHERE id = $1"#
     )
@@ -97,7 +95,7 @@ pub async fn login(
     .unwrap_or(None)
     .flatten();
 
-    tracing::info!("[LOGIN] \u2705 Success for email: {}", body.email);
+    tracing::info!("[LOGIN] \u{2705} Success for email: {}", body.email);
 
     Ok(Json(AuthResponse {
         access_token,
