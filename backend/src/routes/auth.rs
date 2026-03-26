@@ -41,6 +41,7 @@ pub struct LogoutRequest {
     responses(
         (status = 200, description = "Login successful", body = AuthResponse),
         (status = 401, description = "Invalid credentials"),
+        (status = 429, description = "Too many requests"),
     )
 )]
 pub async fn login(
@@ -49,6 +50,7 @@ pub async fn login(
 ) -> Result<Json<AuthResponse>> {
     tracing::debug!("[LOGIN] Attempt for email: {}", body.email);
 
+    // Fetch user including avatar_url so it is available in the response
     let user = sqlx::query_as::<_, User>(
         r#"SELECT id, username, email, "passwordHash" AS password_hash, perms,
            "createdAt" AT TIME ZONE 'UTC' AS created_at
@@ -85,7 +87,17 @@ pub async fn login(
     store_refresh_token(&state.redis, &refresh_token, &user.id, state.cfg.refresh_token_expiry_secs).await
         .map_err(|e| { tracing::error!("[LOGIN] Redis error storing refresh token: {}", e); e })?;
 
-    tracing::info!("[LOGIN] ✅ Success for email: {}", body.email);
+    // Fetch avatar_url separately (not on User model to avoid schema changes)
+    let avatar_url = sqlx::query_scalar::<_, Option<String>>(
+        r#"SELECT avatar_url FROM "Users" WHERE id = $1"#
+    )
+    .bind(&user.id)
+    .fetch_optional(&state.db)
+    .await
+    .unwrap_or(None)
+    .flatten();
+
+    tracing::info!("[LOGIN] \u2705 Success for email: {}", body.email);
 
     Ok(Json(AuthResponse {
         access_token,
@@ -96,7 +108,7 @@ pub async fn login(
             email: user.email,
             perms: user.perms,
             created_at: user.created_at,
-            avatar_url: None,
+            avatar_url,
         },
     }))
 }
